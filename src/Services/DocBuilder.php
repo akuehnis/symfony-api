@@ -4,33 +4,154 @@ namespace Akuehnis\SymfonyApi\Services;
 
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Doctrine\Common\Annotations\AnnotationReader;
-
+use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
+use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
+use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
 class DocBuilder
 {
 
     protected $router;
 
+    private $base_types =  ['string', 'int', 'float', 'bool'];
+
     public function __construct(UrlGeneratorInterface $UrlGeneratorInterface)
     {
         $this->router = $UrlGeneratorInterface;
     }
 
-    public function getSpec() 
-    {
-        $routes = $this->getRoutes();
-        $rows = $this->getEndpoints($routes);
-        return [
-            'swagger' => "2.0",
-            'info' => [
-                "Title" => "Todo",
-            ],
-            'host' => "petstore.swagger.io",
-            'schemes' => ["http", "https"],
-            'tags' => $this->getTags($rows),
-            'paths' => $this->getPaths($rows),
-            'definitions' => $this->getDefinitions($rows),
+    public function getDefinitions($rows){
+        $definitions = [];
+        foreach ($rows as $row){
+            foreach ($row['args'] as $arg) {
+                if ('body' == $arg['location']){
+                    $reflect = new \ReflectionClass($arg['type']);
+                    if (isset($definitions[$reflect->getShortName()])){
+                        continue;
+                    }
+                    $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($arg['type']);
+                } 
+            }
+            if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                $reflect = new \ReflectionClass($row['returnType']);
+                $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($row['returnType']);
+            }
+        }
+        return $definitions;
+    }
+
+
+    public function getDefinitionOfClass($classname) {
+        https://symfony.com/doc/current/components/property_info.html
+        $phpDocExtractor = new PhpDocExtractor();
+        $reflectionExtractor = new ReflectionExtractor();
+        $listExtractors = [$reflectionExtractor];
+        $typeExtractors = [$phpDocExtractor, $reflectionExtractor];
+        $descriptionExtractors = [$phpDocExtractor];
+        $accessExtractors = [$reflectionExtractor];
+        $propertyInitializableExtractors = [$reflectionExtractor];
+
+        $propertyInfo = new PropertyInfoExtractor(
+            $listExtractors,
+            $typeExtractors,
+            $descriptionExtractors,
+            $accessExtractors,
+            $propertyInitializableExtractors
+        );
+        $def = [
+            'type' => 'object',
+            'properties' => [],
         ];
+
+        $properties = $propertyInfo->getProperties($classname);
+        foreach ($properties as $key){
+            $types = $propertyInfo->getTypes($classname, $key);
+            $type = array_shift($types);
+            if ($type) {
+                if ('float' == $type->getBuiltinType()) {
+                    $def['properties'][$key] = [
+                        'type' => 'number',
+                        'format' => 'float'
+                    ];
+                } else if ('int' == $type->getBuiltinType()) {
+                    $def['properties'][$key] = [
+                        'type' => 'number',
+                        'format' => 'integer'
+                    ];
+                } else if ('bool' == $type->getBuiltinType()) {
+                    $def['properties'][$key] = [
+                        'type' => 'boolean',
+                    ];
+                } else if ('string' == $type->getBuiltinType()) {
+                    $def['properties'][$key] = [
+                        'type' => 'string',
+                    ];
+                } else if ('DateTime' == $type->getClassName()){
+                    $def['properties'][$key] = [
+                        'type' => 'string',
+                        'format' => 'date-time'
+                    ];
+                }
+            }
+        }
+        return $def;
+
+    }
+
+    public function getPaths($rows){
+        $paths = [];
+        foreach ($rows as $row) {
+            $path = $row['path'];
+            $methods = array_filter($row['methods'], function($method){
+                $method = strtolower($method);
+                if (!in_array($method, ['options'])) {
+                    return true;
+                }
+                return false;
+            });
+            foreach ($methods as $method){
+                $method = strtolower($method);
+                if (!isset($paths[$path])){
+                    $paths[$path] = [];
+                }
+                if (!isset($paths[$path][$method])){
+                    $paths[$path][$method] = [
+                        'summary' => "todo",
+                        "description" => "todo",
+                        "tags" => $row['tags'],
+                        'parameters' => [],
+                    ];
+                    foreach ($row['args'] as $arg) {
+                        $def = [
+                            'name' => $arg['name'],
+                            'description' => "todo",
+                            'in' => $arg['location'],
+                            'required' => !$arg['optional'],
+                        ];
+                        if ('body' == $arg['location']){
+                            $reflect = new \ReflectionClass($arg['type']);
+                            $def['schema']['$ref'] = $reflect->getShortName();
+                        } else {
+                            $def['type'] = $arg['type'];
+                        }
+                        if ($arg['has_default']){
+                            $def['default'] = $arg['default'];
+                        }
+
+                        $paths[$path][$method]['parameters'][] = $def;
+                    }
+                    //var_dump($row['returnType']);
+                    if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                        $reflect = new \ReflectionClass($row['returnType']);
+                        $paths[$path][$method]['responses']['200']['schema']['$ref'] = $reflect->getShortName();
+                    } else {
+                        $paths[$path][$method]['responses']['200']['schema']['type'] = 'string'; //irgendwelcher HTML content
+                    }
+                }
+            }
+        }
+
+        return $paths;
     }
 
     public function getRoutes() {
@@ -62,8 +183,24 @@ class DocBuilder
         return $routes_of_interest;
     }
 
-    public function getEndpoints($routes) 
+    public function getRows($routes) 
     {
+        https://symfony.com/doc/current/components/property_info.html
+        $phpDocExtractor = new PhpDocExtractor();
+        $reflectionExtractor = new ReflectionExtractor();
+        $listExtractors = [$reflectionExtractor];
+        $typeExtractors = [$phpDocExtractor, $reflectionExtractor];
+        $descriptionExtractors = [$phpDocExtractor];
+        $accessExtractors = [$reflectionExtractor];
+        $propertyInitializableExtractors = [$reflectionExtractor];
+        $propertyInfo = new PropertyInfoExtractor(
+            $listExtractors,
+            $typeExtractors,
+            $descriptionExtractors,
+            $accessExtractors,
+            $propertyInitializableExtractors
+        );
+
         $annotationReader = new AnnotationReader();
         $rows = [];
         foreach ($routes as $route){
@@ -105,7 +242,14 @@ class DocBuilder
             $parameters = $reflection->getParameters();
             $args = [];
             foreach ($parameters as $parameter){
-                $row['args'][] = [
+                $location = 'query';
+                if (false !== strpos($row['path'], '{'.$parameter->getName().'}')){
+                    $location = 'path';
+                }
+                if (is_subclass_of($parameter->getType()->getName(), 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                    $location = 'body';
+                }
+                $args[] = [
                     'type' => $parameter->getType()->getName(),
                     'name' => $parameter->getName(),
                     'optional' => $parameter->isOptional(),
@@ -113,50 +257,32 @@ class DocBuilder
                     'default' => $parameter->isDefaultValueAvailable()
                         ? $parameter->getDefaultValue()
                         : null,
+                    'location' => $location,
                 ]; 
             }
+            $row['args'] = $args;
             $rows[] = $row;
         }
 
         return $rows;
     }
 
-    public function getPaths($rows){
-        $paths = [];
-        foreach ($rows as $row) {
-            $path = $row['path'];
-            $methods = array_filter($row['methods'], function($method){
-                $method = strtolower($method);
-                if (!in_array($method, ['options'])) {
-                    return true;
-                }
-                return false;
-            });
-            foreach ($methods as $method){
-                $method = strtolower($method);
-                if (!isset($paths[$path])){
-                    $paths[$path] = [];
-                }
-                if (!isset($paths[$path][$method])){
-                    $paths[$path][$method] = [
-                        'summary' => "todo",
-                        "description" => "todo",
-                        "tags" => $row['tags'],
-                        'parameters' => [],
-                    ];
-                    foreach ($row['args'] as $arg) {
-                        $paths[$path][$method]['parameters'][] = [
-                            'name' => $arg['name'],
-                            'type' => $arg['type'],
-                            'description' => "todo",
-                            'in' => 'path',
-                        ];
-                    }
-                }
-            }
-        }
-
-        return $paths;
+    public function getSpec() 
+    {
+        $routes = $this->getRoutes();
+        $rows = $this->getRows($routes);
+        return [
+            'swagger' => "2.0",
+            'info' => [
+                "Title" => "Todo",
+            ],
+            'host' => "petstore.swagger.io",
+            'basePath' => "/",
+            'schemes' => ["http", "https"],
+            'tags' => $this->getTags($rows),
+            'paths' => $this->getPaths($rows),
+            'definitions' => $this->getDefinitions($rows),
+        ];
     }
 
     public function getTags($rows){
@@ -179,7 +305,5 @@ class DocBuilder
         return $out;
     }
 
-    public function getDefinitions($rows){
-        return []; //todo
-    }
+
 }
