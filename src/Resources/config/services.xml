@@ -8,6 +8,7 @@
         
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
             <tag name="controller.argument_value_resolver" priority="50"/>
+            <argument type="service" id="Symfony\Component\Validator\Validator\ValidatorInterface" />
         </service>
 
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\BodyResolver">

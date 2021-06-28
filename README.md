@@ -9,6 +9,48 @@ Additional query parameters, input and output model are described using PHP Type
 
 Symfony-API automatically validates input model and returns 400 error if invalid.
 
+## Installation
+
+```
+// config/bundles.php
+
+return [
+    //...
+    Akuehnis\SymfonyApi\AkuehnisSymfonyApi::class => ['all' => true],
+    //...
+];
+
+```
+
+### Openapi UI
+
+To see swagger - ui
+
+```
+# config/routes.yaml
+app.swagger_ui:
+    path: /api/doc
+    methods: GET
+    defaults: { _controller: akuehnis.symfony_api.controller.doc_ui }
+
+```
+
+If not visble, then maybe assets were not installed yet:
+
+```
+bin/console assets:install
+```
+
+### Openapi JSON
+
+To get json:
+```
+# config/routes.yaml
+app.swagger:
+    path: /api/doc.json
+    methods: GET
+    defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
+```
 
 ## Query parameter
 
@@ -183,32 +225,4 @@ class DefaultController
 
 ```
 
-
-# Openapi
-
-To see swagger - ui
-
-```
-# config/routes.yaml
-app.swagger_ui:
-    path: /api/doc
-    methods: GET
-    defaults: { _controller: akuehnis.symfony_api.controller.doc_ui }
-
-```
-
-If not visble, then maybe assets were not installed yet:
-
-```
-bin/console assets:install
-```
-
-To get json:
-```
-# config/routes.yaml
-app.swagger:
-    path: /api/doc.json
-    methods: GET
-    defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
-```
 
