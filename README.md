@@ -201,6 +201,7 @@ If not visble, then maybe assets were not installed yet:
 
 ```
 bin/console assets:install
+```
 
 To get json:
 ```
