@@ -1,0 +1,24 @@
+{
+    "name": "akuehnis/symfony-api",
+    "version": "0.0.1",
+    "type": "library",
+    "description": "Helper to quickly build APIs with Symfony",
+    "keywords": ["php"],
+    "homepage": "https://azular.com",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4.0",
+        "zircote/swagger-php": "^3.0"
+    },
+    "authors": [
+        {
+            "name": "Adrian Kuehnis",
+            "email": "webrequest@azular.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Akuehnis\\SymfonyApi\\": "src/"
+        }
+    }
+}

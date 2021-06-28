@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<container xmlns="http://symfony.com/schema/dic/services"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <services>
+        <defaults autowire="true"/>
+        
+        <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
+            <tag name="controller.argument_value_resolver" priority="50"/>
+        </service>
+
+        <service id="Akuehnis\SymfonyApi\ArgumentResolver\BodyResolver">
+            <tag name="controller.argument_value_resolver" priority="50"/>
+        </service>
+
+        <service id="Akuehnis\SymfonyApi\EventSubscriber\ResponseSubscriber">
+            <tag name="kernel.event_subscriber" />
+        </service>
+
+        <service id="Akuehnis\SymfonyApi\Services\DocBuilder">
+            <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
+        </service>
+
+        <!-- Controllers -->
+        <service id="akuehnis.symfony_api.controller.doc_json" class="Akuehnis\SymfonyApi\Controller\DocumentationController" public="true">
+            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
+        </service>
+
+        <service id="akuehnis.symfony_api.controller.doc_ui" class="Akuehnis\SymfonyApi\Controller\DocumentationUiController" public="true">
+            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
+        </service>
+        
+    </services>
+
+</container>
