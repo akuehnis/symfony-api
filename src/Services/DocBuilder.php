@@ -124,28 +124,29 @@ class DocBuilder
                         'parameters' => [],
                     ];
                     foreach ($row['args'] as $arg) {
-                        $def = [
-                            'name' => $arg['name'],
-                            'description' => "todo",
-                            'in' => $arg['location'],
-                            'required' => !$arg['optional'],
-                        ];
                         if ('body' == $arg['location']){
                             $reflect = new \ReflectionClass($arg['type']);
-                            $def['schema']['$ref'] = $reflect->getShortName();
+                            $paths[$path][$method]['requestBody']['content']['application/json']['schema']['$ref'] = '#/components/schemas/' . $reflect->getShortName();
                         } else {
+                            $def = [
+                                'name' => $arg['name'],
+                                'description' => "todo",
+                                'in' => $arg['location'],
+                                'required' => !$arg['optional'],
+                            ];
+                            
                             $def['type'] = $arg['type'];
-                        }
-                        if ($arg['has_default']){
-                            $def['default'] = $arg['default'];
+                            if ($arg['has_default']){
+                                $def['default'] = $arg['default'];
+                            }
+                            $paths[$path][$method]['parameters'][] = $def;
                         }
 
-                        $paths[$path][$method]['parameters'][] = $def;
                     }
                     //var_dump($row['returnType']);
                     if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                         $reflect = new \ReflectionClass($row['returnType']);
-                        $paths[$path][$method]['responses']['200']['schema']['$ref'] = $reflect->getShortName();
+                        $paths[$path][$method]['responses']['200']['schema']['$ref'] = '#/components/schemas/' . $reflect->getShortName();
                     } else {
                         $paths[$path][$method]['responses']['200']['schema']['type'] = 'string'; //irgendwelcher HTML content
                     }
@@ -274,10 +275,10 @@ class DocBuilder
         $routes = $this->getRoutes();
         $rows = $this->getRows($routes);
         $spec = $this->config_documentation;
-        $spec['swagger'] = '2.0';
+        $spec['openapi'] = '3.0.1';
         $spec['tags'] = $this->getTags($rows);
         $spec['paths'] = $this->getPaths($rows);
-        $spec['definitions'] = $this->getDefinitions($rows);
+        $spec['components']['schemas'] = $this->getDefinitions($rows);
 
         return $spec;
     }

@@ -3,7 +3,7 @@
     "version": "0.0.1",
     "type": "library",
     "description": "Helper to quickly build APIs with Symfony",
-    "keywords": ["php"],
+    "keywords": ["php", "api", "symfony", "documentation", "doc", "rest"],
     "homepage": "https://azular.com",
     "license": "MIT",
     "require": {

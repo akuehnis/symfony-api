@@ -58,8 +58,9 @@ app.swagger:
 # config/packages/akuehnis_symfony_api.yaml
 akuehnis_symfony_api:
     documentation:
-        host: api.example.com
-        schemes: [http, https]
+        servers: 
+            - url: https://api.example.com/v1
+            - url: http://api.example.com/v1
         info:
             title: My App
             description: This is an awesome app!
