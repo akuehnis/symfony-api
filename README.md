@@ -52,12 +52,99 @@ app.swagger:
     defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
 ```
 
+### Configuration
+
+```
+# config/packages/akuehnis_symfony_api.yaml
+akuehnis_symfony_api:
+    documentation:
+        host: api.example.com
+        schemes: [http, https]
+        info:
+            title: My App
+            description: This is an awesome app!
+            version: 1.0.0
+        securityDefinitions:
+            Bearer:
+                type: apiKey
+                description: 'Value: Bearer {jwt}'
+                name: Authorization
+                in: header
+        security:
+            - Bearer: [] 
+```
+
+### Add an URL to the Openapi Documentation
+
+Symfony API will only add routes to the documentation where an annotation of
+Akuehnis\SymfonyApi\Annotations\Tag is present.
+
+The following code snipped shows two controller functions. Both of them will be processed by 
+Symfony-API, however, only the first will be in the documentation because it has the 
+Tag annotation.
+
+```
+<?php
+// src/Controller/DefaultController.php
+namespace App\Controller
+
+use Akuehnis\SymfonyApi\Annotations\Tag as DocuTag;
+use App\Schemas\MyOutputModel;
+
+class DefaultController
+{
+    /**
+     * @DocuTag(name="abrakadabra")
+     * @Route("/hello/{name}", name="app_hello", methods={"GET"})
+     */
+    public function hello(string $name, int $number = 25): MyOutputModel
+    {
+        $model = new MyOutputModel();
+        $model->name = $name;
+        $model->number = $number;
+        return $model;
+    }
+
+    /**
+     * @Route("/notindoku/{name}", name="app_notindoku", methods={"GET"})
+     */
+    public function notindoku(string $name, int $number = 25): MyOutputModel
+    {
+        $model = new MyOutputModel();
+        $model->name = $name;
+        $model->number = $number;
+        return $model;
+    }
+
+}
+```
+
 ## Query parameter
 
-If a parameter is not defined in the path and is of type float, int, bool or string, 
-it will be inserted by SymfonyApi automatically.
+If a controller function parameter is not defined in the path and is of type string, float, int or bool,
+it will be validated and injected by SymfonyApi automatically.
 
-Set a default value.
+```
+/**
+  * @Route("/testhello/{group}", name="app_testhello", methods={"GET"})
+*/
+public function testhello(string $group, string $search): Response
+{
+    /* 
+       Example:
+
+       GET /testhello/customers?search=Peter
+
+       $group will contain string 'customers'
+       $search will contain string 'Peter' 
+    */
+}
+```
+
+
+### Query parameter with default value
+
+If a query parameter, set a default value.
 
 ```
 /**
@@ -66,49 +153,71 @@ Set a default value.
 public function testfloat(float $number = 22.45): Response
 {
     /* 
-    ...
+       if $number is not passed a query parameter it will be 22.45. 
     */
 }
 ```
 
+### Nullable query parameter
 Allow a parameter to be NULL by setting default value to NULL.
 
 ```
 /**
-  * @Route("/testfloatnull", name="app_testfloatnull", methods={"GET"})
+  * @Route("/teststringnull", name="app_teststringnull", methods={"GET"})
 */
-public function testfloat(float $number = NULL): Response
+public function teststringnull(string $myname = NULL): Response
 {
     /* 
-    ...
+        $myname can be string or null.
     */
 }
 ```
 
-If a parameter may not be null, then do not add a default value.
+### Required query parameter
+
+If a parameter is required, then do not preset neither a default value nor NULL.
 
 ```
 /**
-  * @Route("/testfloat", name="app_testfloat", methods={"GET"})
+  * @Route("/testrequired", name="app_testrequired", methods={"GET"})
 */
-public function testfloat(float $number): Response
+public function testrequired(int $quantity): Response
 {
     /* 
-    ...
+       $quantity must be set. If it is not present in the url, then a 400 error will be returned.
     */
 }
 ```
 
-### Boolean Values
 
-Symfony-Api does treat the words 'false' and 'yes' (upper or lower case) as false. 
+### Boolean query parameter
 
-All other values depend on how PHP converts a value to boolean. 
+Symfony-Api does treat the following values as 'false':
+    * false
+    * 0
+    * empty string
 
-Usually, empty string and '0' are converted to 'false', all other values to 'true'.
+All other values will be 'true'
+
+```
+/**
+  * @Route("/testbool", name="app_testbool", methods={"GET"})
+*/
+public function testbool(bool $activated = true): Response
+{
+    /* 
+       /testbool?activated=true: true
+       /testbool?activated=1:    true
+       /testbool?activated=null: true
+       /testbool?activated=:     false
+       /testbool?activated=0:    false
+       /testbool?activated=false:false
+    */
+}
+```
 
 
-## Body Parameters
+## Body Model
 
 The model MUST extend ApiBaseModel
 

@@ -12,12 +12,14 @@ class DocBuilder
 {
 
     protected $router;
+    protected $config_documentation = [];
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
-    public function __construct(UrlGeneratorInterface $UrlGeneratorInterface)
+    public function __construct(UrlGeneratorInterface $UrlGeneratorInterface, $config_documentation)
     {
         $this->router = $UrlGeneratorInterface;
+        $this->config_documentation = $config_documentation;
     }
 
     public function getDefinitions($rows){
@@ -171,7 +173,7 @@ class DocBuilder
             $annotations = $annotationReader->getMethodAnnotations($reflection );
             $tag = null;
             foreach ($annotations as $annotation) {
-                if ('OpenApi\Annotations\Tag' == get_class($annotation)){
+                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
                     $tag = $annotation->name;
                 }
             }
@@ -225,17 +227,17 @@ class DocBuilder
             }
             $reflection = new \ReflectionMethod($class, $method);
             $annotations = $annotationReader->getMethodAnnotations($reflection );
-            $tag = null;
+            $tags = [];
             foreach ($annotations as $annotation) {
-                if ('OpenApi\Annotations\Tag' == get_class($annotation)){
-                    $tag = $annotation->name;
+                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
+                    $tags[] = $annotation->name;
                 }
             }
-            if (!$tag) {
+            if (0 == count($tags)) {
                 continue;
             }
             $returnType = $reflection->getReturnType();
-            $row['tags'] = [$tag];
+            $row['tags'] = $tags;
             $row['returnType'] = null === $returnType 
                 ? null
                 : $reflection->getReturnType()->getName();
@@ -271,18 +273,13 @@ class DocBuilder
     {
         $routes = $this->getRoutes();
         $rows = $this->getRows($routes);
-        return [
-            'swagger' => "2.0",
-            'info' => [
-                "Title" => "Todo",
-            ],
-            'host' => "petstore.swagger.io",
-            'basePath' => "/",
-            'schemes' => ["http", "https"],
-            'tags' => $this->getTags($rows),
-            'paths' => $this->getPaths($rows),
-            'definitions' => $this->getDefinitions($rows),
-        ];
+        $spec = $this->config_documentation;
+        $spec['swagger'] = '2.0';
+        $spec['tags'] = $this->getTags($rows);
+        $spec['paths'] = $this->getPaths($rows);
+        $spec['definitions'] = $this->getDefinitions($rows);
+
+        return $spec;
     }
 
     public function getTags($rows){

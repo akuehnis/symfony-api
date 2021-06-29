@@ -8,7 +8,7 @@ class Configuration implements ConfigurationInterface
 {
     public function getConfigTreeBuilder()
     {
-        $treeBuilder = new TreeBuilder('symfony-api');
+        $treeBuilder = new TreeBuilder('akuehnis_symfony_api');
 
         $treeBuilder->getRootNode()
             ->children()

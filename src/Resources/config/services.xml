@@ -21,6 +21,7 @@
 
         <service id="Akuehnis\SymfonyApi\Services\DocBuilder">
             <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
+            <argument key="$config_documentation">%akuehnis_symfony_api.documentation%</argument>
         </service>
 
         <!-- Controllers -->

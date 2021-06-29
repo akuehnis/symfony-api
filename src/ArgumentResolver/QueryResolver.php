@@ -45,7 +45,7 @@ class QueryResolver implements ArgumentValueResolverInterface
             $val = $request->query->get($argument->getName());
             if (null === $val && !$argument->isNullable() && $argument->hasDefaultValue()){
                 yield $argument->getDefaultValue();
-            } else if ('bool' == $type && 'false' == strtolower($val)){
+            } else if ('bool' == $type && in_array(trim(strtolower($val)), ['false', '0', ''] )){
                 yield false;
             } else {
                 yield $val;
