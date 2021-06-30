@@ -24,9 +24,23 @@ class AkuehnisSymfonyApiExtension extends Extension
                     ]
                 ],
                 'info' => [
-                    'title' => 'My App',
-                    'description' => 'This is an awesome app!',
+                    'title' => 'API Title2',
+                    'description' => 'Modify API information in config/packages/akuehnis_symfony_api.yaml. ',
                     'version' => '1.0.0',
+                ],
+                'components' => [
+                    'securitySchemes' => [
+                        'api_key' => [
+                            'type' => 'apiKey',
+                            'name' => 'X-API-KEY',
+                            'in' => 'header',
+                        ]
+                    ],
+                ],
+                'security' => [
+                    [
+                    'api_key' => []
+                    ]
                 ]
             ]);
         }

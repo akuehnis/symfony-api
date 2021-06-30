@@ -62,17 +62,17 @@ akuehnis_symfony_api:
             - url: https://api.example.com/v1
             - url: http://api.example.com/v1
         info:
-            title: My App
-            description: This is an awesome app!
+            title: API Tile
+            description: API Description
             version: 1.0.0
-        securityDefinitions:
-            Bearer:
-                type: apiKey
-                description: 'Value: Bearer {jwt}'
-                name: Authorization
-                in: header
+        components: 
+            securitySchemes:
+                api_key:
+                    type: apiKey
+                    name: X-API-KEY
+                    in: header
         security:
-            - Bearer: [] 
+            - api_key: [] 
 ```
 
 ### Add an URL to the Openapi Documentation
@@ -83,6 +83,8 @@ Akuehnis\SymfonyApi\Annotations\Tag is present.
 The following code snipped shows two controller functions. Both of them will be processed by 
 Symfony-API, however, only the first will be in the documentation because it has the 
 Tag annotation.
+
+For documentation, PHPDoc-Comments will be used (see exmple below).
 
 ```
 <?php
@@ -95,8 +97,16 @@ use App\Schemas\MyOutputModel;
 class DefaultController
 {
     /**
+     * The first line will be the endpoint summary
+     * 
+     * Further lines will be the endpoint description.
+     *
      * @DocuTag(name="abrakadabra")
      * @Route("/hello/{name}", name="app_hello", methods={"GET"})
+     * 
+     * @param string $name This is the description for the parameter 'name'
+     * @param string $number This is the description of the parameter 'number'
+     * @return This is description of the return value
      */
     public function hello(string $name, int $number = 25): MyOutputModel
     {

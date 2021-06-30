@@ -118,8 +118,8 @@ class DocBuilder
                 }
                 if (!isset($paths[$path][$method])){
                     $paths[$path][$method] = [
-                        'summary' => "todo",
-                        "description" => "todo",
+                        'summary' => $row['summary'],
+                        "description" => $row['description'],
                         "tags" => $row['tags'],
                         'parameters' => [],
                     ];
@@ -128,27 +128,55 @@ class DocBuilder
                             $reflect = new \ReflectionClass($arg['type']);
                             $paths[$path][$method]['requestBody']['content']['application/json']['schema']['$ref'] = '#/components/schemas/' . $reflect->getShortName();
                         } else {
-                            $def = [
+                            $parameter = [
                                 'name' => $arg['name'],
-                                'description' => "todo",
+                                'description' => $arg['description'],
                                 'in' => $arg['location'],
-                                'required' => !$arg['optional'],
+                                'required' => !$arg['has_default'],
                             ];
                             
-                            $def['type'] = $arg['type'];
-                            if ($arg['has_default']){
-                                $def['default'] = $arg['default'];
+                            $schema = [];
+                            if ('string' == $arg['type']){
+                                $schema['type'] = 'string';
+                            } else if ('int' == $arg['type']){
+                                $schema['type'] = 'integer';
+                            } else if ('float' == $arg['type']){
+                                $schema['type'] = 'number';
+                                $schema['format'] = 'float';
+                            } else if ('bool' == $arg['type']){
+                                $schema['type'] = 'boolean';
                             }
-                            $paths[$path][$method]['parameters'][] = $def;
+                            if ($arg['has_default']){
+                                $schema['default'] = $arg['default'];
+                            }
+                            $parameter['schema'] = $schema;
+                            $paths[$path][$method]['parameters'][] = $parameter;
                         }
 
                     }
-                    //var_dump($row['returnType']);
                     if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                         $reflect = new \ReflectionClass($row['returnType']);
-                        $paths[$path][$method]['responses']['200']['schema']['$ref'] = '#/components/schemas/' . $reflect->getShortName();
+                        $paths[$path][$method]['responses']['200'] = [
+                            'description'=> $row['response_description'],
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        '$ref' => '#/components/schemas/' . $reflect->getShortName(),
+                                    ]
+                                ]
+                            ]
+                        ];
                     } else {
-                        $paths[$path][$method]['responses']['200']['schema']['type'] = 'string'; //irgendwelcher HTML content
+                        $paths[$path][$method]['responses']['200'] = [
+                            'description'=> $row['response_description'],
+                            'content' => [
+                                'text/html' => [
+                                    'schema' => [
+                                        'type' => 'string'
+                                    ]
+                                ]
+                            ],
+                        ];
                     }
                 }
             }
@@ -170,6 +198,7 @@ class DocBuilder
             if (!class_exists($class)){
                 continue;
             }
+            
             $reflection = new \ReflectionMethod($class, $method);
             $annotations = $annotationReader->getMethodAnnotations($reflection );
             $tag = null;
@@ -188,22 +217,6 @@ class DocBuilder
 
     public function getRows($routes) 
     {
-        https://symfony.com/doc/current/components/property_info.html
-        $phpDocExtractor = new PhpDocExtractor();
-        $reflectionExtractor = new ReflectionExtractor();
-        $listExtractors = [$reflectionExtractor];
-        $typeExtractors = [$phpDocExtractor, $reflectionExtractor];
-        $descriptionExtractors = [$phpDocExtractor];
-        $accessExtractors = [$reflectionExtractor];
-        $propertyInitializableExtractors = [$reflectionExtractor];
-        $propertyInfo = new PropertyInfoExtractor(
-            $listExtractors,
-            $typeExtractors,
-            $descriptionExtractors,
-            $accessExtractors,
-            $propertyInitializableExtractors
-        );
-
         $annotationReader = new AnnotationReader();
         $rows = [];
         foreach ($routes as $route){
@@ -217,12 +230,10 @@ class DocBuilder
                 'condition' => $route->getCondition(),
                 'tags' => ['default'],
             ];
-            
             if (!isset($row['defaults']['_controller']) || false === strpos($row['defaults']['_controller'], '::')){
                 continue;
             }
             list($class, $method) = explode('::', $row['defaults']['_controller']);
-
             if (!class_exists($class)){
                 continue;
             }
@@ -242,6 +253,12 @@ class DocBuilder
             $row['returnType'] = null === $returnType 
                 ? null
                 : $reflection->getReturnType()->getName();
+
+            $docblock = $reflection->getDocComment();
+            list($summary, $description, $arguments, $response_description) = $this->getSummaryAndDescription($docblock);
+            $row['summary'] = $summary;
+            $row['description'] = $description;
+            $row['response_description'] = $response_description;
             $parameters = $reflection->getParameters();
             $args = [];
             foreach ($parameters as $parameter){
@@ -253,6 +270,7 @@ class DocBuilder
                     $location = 'body';
                 }
                 $args[] = [
+                    'description' => isset($arguments[$parameter->getName()]) ? $arguments[$parameter->getName()] : '',
                     'type' => $parameter->getType()->getName(),
                     'name' => $parameter->getName(),
                     'optional' => $parameter->isOptional(),
@@ -301,6 +319,43 @@ class DocBuilder
             ];
         }
         return $out;
+    }
+
+    public function getSummaryAndDescription(string $docblock) {
+        if (!$docblock){
+            $docblock = '';
+        }
+        $summary = '';
+        $description = '';
+        $parameters = [];
+        $return = '';
+        $a = explode("\n", $docblock);
+        foreach ($a as $i => $row){
+            $row = trim($row, ' */');
+            $row = trim($row);
+            if ('' == $row){
+                continue;
+            } else if (0 === strpos($row, '@param')){
+                $start = strpos($row, '$');
+                
+                if ($start){
+                    $string = substr($row, $start + 1);
+                    $end = strpos($string, ' ');
+                    $parameter_name = substr($string, 0, $end);
+                    $parameter_description = substr($string, $end+1);
+                    $parameters[$parameter_name] = $parameter_description;
+                }
+            } else if (0 === strpos($row, '@return')){
+                $return = trim(str_replace('@return', '', $row));       
+            } else if (0 === strpos($row, '@')){
+                continue;
+            } else if ('' == $summary) {
+                $summary = $row;
+            } else {
+                $description.= $row;
+            }
+        }
+        return [$summary, $description, $parameters, $return];
     }
 
 
