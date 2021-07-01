@@ -154,6 +154,7 @@ class DocBuilder
                         }
 
                     }
+                    
                     if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                         $reflect = new \ReflectionClass($row['returnType']);
                         $paths[$path][$method]['responses']['200'] = [
@@ -255,22 +256,23 @@ class DocBuilder
                 : $reflection->getReturnType()->getName();
 
             $docblock = $reflection->getDocComment();
-            list($summary, $description, $arguments, $response_description) = $this->getSummaryAndDescription($docblock);
-            $row['summary'] = $summary;
-            $row['description'] = $description;
-            $row['response_description'] = $response_description;
+            $doc = $this->parseMethodDocComment($docblock);
+            $row['summary'] = $doc->summary;
+            $row['description'] = $doc->description;
+            $row['response_description'] = $doc->response_model->description;
+            $row['response_type'] = $doc->response_model->type;
+            $row['response_item'] = $doc->response_model->item;
             $parameters = $reflection->getParameters();
             $args = [];
             foreach ($parameters as $parameter){
                 $location = 'query';
                 if (false !== strpos($row['path'], '{'.$parameter->getName().'}')){
                     $location = 'path';
-                }
-                if (is_subclass_of($parameter->getType()->getName(), 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                } else if (is_subclass_of($parameter->getType()->getName(), 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                     $location = 'body';
-                }
+                } 
                 $args[] = [
-                    'description' => isset($arguments[$parameter->getName()]) ? $arguments[$parameter->getName()] : '',
+                    'description' => isset($doc->params[$parameter->getName()]) ? $doc->params[$parameter->getName()]->description : '',
                     'type' => $parameter->getType()->getName(),
                     'name' => $parameter->getName(),
                     'optional' => $parameter->isOptional(),
@@ -321,41 +323,58 @@ class DocBuilder
         return $out;
     }
 
-    public function getSummaryAndDescription(string $docblock) {
-        if (!$docblock){
-            $docblock = '';
+    public function parseMethodDocComment(string $docComment) {
+        $response = (object)[
+            'summary' => '',
+            'description' => '',
+            'params' => [
+
+            ],
+            'response_model' => (object)[
+                'description' => '',
+                'type' => 'string',
+                'item' => null, // if type is array
+            ]
+        ];
+
+        if (!$docComment) {
+            $response['return'] = null;
+            return $response;
         }
-        $summary = '';
-        $description = '';
-        $parameters = [];
-        $return = '';
-        $a = explode("\n", $docblock);
-        foreach ($a as $i => $row){
-            $row = trim($row, ' */');
-            $row = trim($row);
-            if ('' == $row){
-                continue;
-            } else if (0 === strpos($row, '@param')){
-                $start = strpos($row, '$');
-                
-                if ($start){
-                    $string = substr($row, $start + 1);
-                    $end = strpos($string, ' ');
-                    $parameter_name = substr($string, 0, $end);
-                    $parameter_description = substr($string, $end+1);
-                    $parameters[$parameter_name] = $parameter_description;
+
+        $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+        $docblock = $factory->create($docComment);
+        $response->summary = $docblock->getSummary();
+        $response->description = $docblock->getDescription()->getBodyTemplate();
+        
+        foreach($docblock->getTags() as $tag){
+            if ('param' == $tag->getName()){
+                $name = $tag->getVariableName();
+                if ($name){
+                    $response->params[$name] = (object)[
+                        'type' => $tag->getType()->__toString(),
+                        'description' => $tag->getDescription()->getBodyTemplate(),
+                    ];
+                    
                 }
-            } else if (0 === strpos($row, '@return')){
-                $return = trim(str_replace('@return', '', $row));       
-            } else if (0 === strpos($row, '@')){
-                continue;
-            } else if ('' == $summary) {
-                $summary = $row;
-            } else {
-                $description.= $row;
+            }
+            if ('return' == $tag->getName()){
+                $response->response_model->description = $tag->getDescription()->getBodyTemplate();
+                $type = $tag->getType();
+                if ('phpDocumentor\Reflection\Types\Array_' == get_class($type)){
+                    $response->response_model->type = 'array';
+                    $valueType = $type->getValueType();
+                    if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
+                        $response->response_model->item = $type->getValueType()->getFqsen()->getName();
+                    } else {
+                        $response->response_model->item = $valueType->__toString();
+                    }
+                } 
             }
         }
-        return [$summary, $description, $parameters, $return];
+        
+        return $response;
+        
     }
 
 

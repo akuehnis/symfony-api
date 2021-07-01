@@ -1,6 +1,6 @@
-# Symfony API
+# Symfony-API
 
-Symfony API allows to build and document APIs.
+Symfony-API allows to build and document APIs.
 
 The project is inspired by https://fastapi.tiangolo.com/ (Python) and NelmioApiDocBundle (https://github.com/nelmio/NelmioApiDocBundle).
 
@@ -77,7 +77,7 @@ akuehnis_symfony_api:
 
 ### Add an URL to the Openapi Documentation
 
-Symfony API will only add routes to the documentation where an annotation of
+Symfony-API will only add routes to the documentation where an annotation of
 Akuehnis\SymfonyApi\Annotations\Tag is present.
 
 The following code snipped shows two controller functions. Both of them will be processed by 
@@ -345,4 +345,22 @@ class DefaultController
 
 ```
 
+
+## Type declarations (Type-Hinting or PHPDocBlock)
+
+By default, Symfony-API uses Type hints to find out what type of variable is required. With one exception:
+
+If the type is an array, then PHP does only allow to typehint 'array' without further description what the array
+contains. In these cases, Symfony-API parses the PHPDoc. This allows to specify array contents.
+
+```
+@return MyOutputModel[] Array of output models
+
+or 
+
+@return array<MyOutputModel> Array of output models
+```
+
+In all other cases Symfony-API uses type hint information for validation. However, if available, PHPDoc type information
+is used for documentation.
 
