@@ -75,6 +75,8 @@ akuehnis_symfony_api:
             - api_key: [] 
 ```
 
+Clear the cache after making any changes.
+
 ### Add an URL to the Openapi Documentation
 
 Symfony-API will only add routes to the documentation where an annotation of

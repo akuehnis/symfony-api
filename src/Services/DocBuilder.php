@@ -8,36 +8,48 @@ use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
+use Akuehnis\SymfonyApi\Services\DocBlockService;
+use Akuehnis\SymfonyApi\Services\TypeHintService;
+
 class DocBuilder
 {
 
     protected $router;
     protected $config_documentation = [];
+    protected $DocBlockService;
+    protected $TypeHintService;
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
-    public function __construct(UrlGeneratorInterface $UrlGeneratorInterface, $config_documentation)
-    {
+    public function __construct(
+        UrlGeneratorInterface $UrlGeneratorInterface
+        , DocBlockService $DocBlockService
+        , TypeHintService $TypeHintService
+        , $config_documentation
+    ){
         $this->router = $UrlGeneratorInterface;
+        $this->DocBlockService = $DocBlockService;
+        $this->TypeHintService = $TypeHintService;
         $this->config_documentation = $config_documentation;
+
     }
 
-    public function getDefinitions($rows){
+    public function getDefinitions($routes){
         $definitions = [];
-        foreach ($rows as $row){
-            foreach ($row['args'] as $arg) {
-                if ('body' == $arg['location']){
-                    $reflect = new \ReflectionClass($arg['type']);
-                    if (isset($definitions[$reflect->getShortName()])){
-                        continue;
-                    }
-                    $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($arg['type']);
-                } 
+        foreach ($routes as $route){
+            $reflection = $this->TypeHintService->getMethodReflection($route);
+            $docComment = $reflection->getDocComment();
+            $classes = $this->DocBlockService->getClasses($docComment);
+            $classes_docblock = $this->TypeHintService->getClasses($route);
+            foreach($classes_docblock as $name => $class_name){
+                $classes[$name] = $class_name;
             }
-            if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
-                $reflect = new \ReflectionClass($row['returnType']);
-                $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($row['returnType']);
-            }
+            foreach($classes as $class_name){
+                if (is_subclass_of($class_name, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                    $reflect = new \ReflectionClass($class_name);
+                    $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($class_name);
+                }
+            }         
         }
         return $definitions;
     }
@@ -68,6 +80,10 @@ class DocBuilder
         $properties = $propertyInfo->getProperties($classname);
         foreach ($properties as $key){
             $types = $propertyInfo->getTypes($classname, $key);
+            if (null === $types){
+                continue;
+                // Todo: if any of Response, JsonResponse or similar, create it's definition
+            }
             $type = array_shift($types);
             if ($type) {
                 if ('float' == $type->getBuiltinType()) {
@@ -100,85 +116,163 @@ class DocBuilder
 
     }
 
-    public function getPaths($rows){
+    public function getTypeAndFormat($type){
+        $type = $type;
+        $format = null;
+        if ('int' == $type){
+            $type = 'integer';
+        } else if ('float' == $type){
+            $type = 'number';
+            $format = 'float';
+        } else if ('bool' == $type){
+            $type = 'boolean';
+        }
+
+        return [$type, $format];
+    }
+
+    public function getPaths($routes){
         $paths = [];
-        foreach ($rows as $row) {
-            $path = $row['path'];
-            $methods = array_filter($row['methods'], function($method){
+        foreach ($routes as $route) {
+            $reflection = $this->TypeHintService->getMethodReflection($route);
+            $docComment = $reflection->getDocComment();
+            $path = $route->getPath();
+            $tags = $this->TypeHintService->getMethodTags($route);
+            $summary = $this->DocBlockService->getMethodSummary($docComment);
+            $description = $this->DocBlockService->getMethodDescription($docComment);
+            $params_docblock =  $this->DocBlockService->getParameters($docComment);
+            $params_typehint =  $this->TypeHintService->getParameters($route);
+            $methods = array_filter($route->getMethods(), function($method){
                 $method = strtolower($method);
-                if (!in_array($method, ['options'])) {
-                    return true;
+                if (in_array($method, ['options'])) {
+                    return false;
                 }
-                return false;
+                return true;
             });
+
+            $parameters = [];
+            foreach ($params_typehint as $param_name => $def) {
+                if ('body' == $def->location){
+                    // will be used below, see request_body
+                    continue;
+                }
+                $parameter_def = [
+                    'name' => $param_name,
+                ];
+                if (isset($params_docblock[$param_name]) && $params_docblock[$param_name]->description){
+                    $parameter_def['description'] = $params_docblock[$param_name]->description;
+                }
+                if (null !== $def->location){
+                    $parameter_def['in'] = $def->location;
+                }
+                if (true === $def->required){
+                    $parameter_def['required'] = true;
+                }
+                
+                
+                if (isset($params_docblock[$param_name]) && $params_docblock[$param_name]->type){   
+                    // Wenn docblock vorhande, verwende diese Definition 
+                    list($type, $format) = $this->getTypeAndFormat($params_docblock[$param_name]->type);
+                    $parameter_def['schema'] = [
+                        'type' => $type
+                    ];
+                    if (null !== $format) {
+                        $parameter_def['schema']['format'] = $format;
+                    }
+                    if (null !== $def->has_default){
+                        $parameter_def['schema']['default'] = $def->default;
+                    }
+
+                } else if ($def->type) {
+                    // Wenn kein Docblock vorhanden, verwende Typehints
+                    list($type, $format) = $this->getTypeAndFormat($def->type);
+                    $parameter_def['schema'] = [
+                        'type' => $type
+                    ];
+                    if (null !== $format) {
+                        $parameter_def['schema']['format'] = $format;
+                    }
+                    if (null !== $def->has_default){
+                        $parameter_def['schema']['default'] = $def->default;
+                    }
+                }
+
+                $parameters[] = $parameter_def;
+            }
+            $responses = [];
+
+            $return_docblock = $this->TypeHintService->getMethodReturnModel($route);
+            $return_typehint = $this->DocBlockService->getMethodReturnModel($docComment);
+            $return_model = null !== $return_docblock
+                ? $return_docblock
+                : $return_typehint;
+            if (null !== $return_model){
+                if (is_subclass_of($return_model->type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                    $reflect = new \ReflectionClass($return_model->type);
+                    $responses['200'] = [
+                        'description'=> $return_model->description,
+                        'content' => [
+                            'application/json' => [
+                                'schema' => [
+                                    '$ref' => '#/components/schemas/' . $reflect->getShortName(),
+                                ]
+                            ]
+                        ]
+                    ];
+                } else {
+                    $responses['200'] = [
+                        'description'=> $return_model->description,
+                        'content' => [
+                            'text/html' => [
+                                'schema' => [
+                                    'type' => 'string'
+                                ]
+                            ]
+                        ],
+                    ];
+                }
+            }
+
+            $body_param_name = null;
+            foreach ($params_typehint as $param_name => $def) {
+                if ('body' == $def->location){
+                    $body_param_name = $param_name;
+                }
+            }
+            $body_model = null;
+            $request_body = null;
+            if ($body_param_name && isset($params_docblock[$body_param_name])){
+                $body_model = $params_docblock[$body_param_name];
+            } else if ($body_param_name && isset($params_typehint[$body_param_name])){
+                $body_model = $params_typehint[$body_param_name];
+            }
+            if ($body_model){
+                $reflect = new \ReflectionClass($def->type);
+                $request_body = [
+                    'content' => [
+                        'application/json' => [
+                            'schema' => [
+                                '$ref' => '#/components/schemas/' . $reflect->getShortName(),
+                            ]
+                        ]
+                    ]
+                ];
+            }
+
             foreach ($methods as $method){
                 $method = strtolower($method);
                 if (!isset($paths[$path])){
                     $paths[$path] = [];
                 }
-                if (!isset($paths[$path][$method])){
-                    $paths[$path][$method] = [
-                        'summary' => $row['summary'],
-                        "description" => $row['description'],
-                        "tags" => $row['tags'],
-                        'parameters' => [],
-                    ];
-                    foreach ($row['args'] as $arg) {
-                        if ('body' == $arg['location']){
-                            $reflect = new \ReflectionClass($arg['type']);
-                            $paths[$path][$method]['requestBody']['content']['application/json']['schema']['$ref'] = '#/components/schemas/' . $reflect->getShortName();
-                        } else {
-                            $parameter = [
-                                'name' => $arg['name'],
-                                'description' => $arg['description'],
-                                'in' => $arg['location'],
-                                'required' => !$arg['has_default'],
-                            ];
-                            
-                            $schema = [];
-                            if ('string' == $arg['type']){
-                                $schema['type'] = 'string';
-                            } else if ('int' == $arg['type']){
-                                $schema['type'] = 'integer';
-                            } else if ('float' == $arg['type']){
-                                $schema['type'] = 'number';
-                                $schema['format'] = 'float';
-                            } else if ('bool' == $arg['type']){
-                                $schema['type'] = 'boolean';
-                            }
-                            if ($arg['has_default']){
-                                $schema['default'] = $arg['default'];
-                            }
-                            $parameter['schema'] = $schema;
-                            $paths[$path][$method]['parameters'][] = $parameter;
-                        }
-
-                    }
-                    
-                    if (is_subclass_of($row['returnType'], 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
-                        $reflect = new \ReflectionClass($row['returnType']);
-                        $paths[$path][$method]['responses']['200'] = [
-                            'description'=> $row['response_description'],
-                            'content' => [
-                                'application/json' => [
-                                    'schema' => [
-                                        '$ref' => '#/components/schemas/' . $reflect->getShortName(),
-                                    ]
-                                ]
-                            ]
-                        ];
-                    } else {
-                        $paths[$path][$method]['responses']['200'] = [
-                            'description'=> $row['response_description'],
-                            'content' => [
-                                'text/html' => [
-                                    'schema' => [
-                                        'type' => 'string'
-                                    ]
-                                ]
-                            ],
-                        ];
-                    }
+                $paths[$path][$method] = [
+                    'summary' => $summary,
+                    "description" => $description,
+                    "tags" => $tags,
+                    'parameters' => $parameters,
+                    'responses' => $responses,
+                ];
+                if ($request_body){
+                    $paths[$path][$method]['requestBody'] = $request_body;
                 }
             }
         }
@@ -186,7 +280,7 @@ class DocBuilder
         return $paths;
     }
 
-    public function getRoutes() {
+    public function getApiRoutes() {
         $annotationReader = new AnnotationReader();
         $routes = $this->router->getRouteCollection();
         $routes_of_interest = [];
@@ -216,100 +310,26 @@ class DocBuilder
         return $routes_of_interest;
     }
 
-    public function getRows($routes) 
-    {
-        $annotationReader = new AnnotationReader();
-        $rows = [];
-        foreach ($routes as $route){
-            $row = [
-                'path' => $route->getPath(),
-                'schemes' => $route->getSchemes(),
-                'methods' => $route->getMethods(),
-                'options' => $route->getOptions(),
-                'defaults' => $route->getDefaults(),
-                'requirements' => $route->getRequirements(),
-                'condition' => $route->getCondition(),
-                'tags' => ['default'],
-            ];
-            if (!isset($row['defaults']['_controller']) || false === strpos($row['defaults']['_controller'], '::')){
-                continue;
-            }
-            list($class, $method) = explode('::', $row['defaults']['_controller']);
-            if (!class_exists($class)){
-                continue;
-            }
-            $reflection = new \ReflectionMethod($class, $method);
-            $annotations = $annotationReader->getMethodAnnotations($reflection );
-            $tags = [];
-            foreach ($annotations as $annotation) {
-                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
-                    $tags[] = $annotation->name;
-                }
-            }
-            if (0 == count($tags)) {
-                continue;
-            }
-            $returnType = $reflection->getReturnType();
-            $row['tags'] = $tags;
-            $row['returnType'] = null === $returnType 
-                ? null
-                : $reflection->getReturnType()->getName();
-
-            $docblock = $reflection->getDocComment();
-            $doc = $this->parseMethodDocComment($docblock);
-            $row['summary'] = $doc->summary;
-            $row['description'] = $doc->description;
-            $row['response_description'] = $doc->response_model->description;
-            $row['response_type'] = $doc->response_model->type;
-            $row['response_item'] = $doc->response_model->item;
-            $parameters = $reflection->getParameters();
-            $args = [];
-            foreach ($parameters as $parameter){
-                $location = 'query';
-                if (false !== strpos($row['path'], '{'.$parameter->getName().'}')){
-                    $location = 'path';
-                } else if (is_subclass_of($parameter->getType()->getName(), 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
-                    $location = 'body';
-                } 
-                $args[] = [
-                    'description' => isset($doc->params[$parameter->getName()]) ? $doc->params[$parameter->getName()]->description : '',
-                    'type' => $parameter->getType()->getName(),
-                    'name' => $parameter->getName(),
-                    'optional' => $parameter->isOptional(),
-                    'has_default' => $parameter->isDefaultValueAvailable(),
-                    'default' => $parameter->isDefaultValueAvailable()
-                        ? $parameter->getDefaultValue()
-                        : null,
-                    'location' => $location,
-                ]; 
-            }
-            $row['args'] = $args;
-            $rows[] = $row;
-        }
-
-        return $rows;
-    }
 
     public function getSpec() 
     {
-        $routes = $this->getRoutes();
-        $rows = $this->getRows($routes);
+        $routes = $this->getApiRoutes();
         $spec = $this->config_documentation;
         $spec['openapi'] = '3.0.1';
-        $spec['tags'] = $this->getTags($rows);
-        $spec['paths'] = $this->getPaths($rows);
-        $spec['components']['schemas'] = $this->getDefinitions($rows);
+        $spec['tags'] = $this->getTags($routes);
+        $spec['paths'] = $this->getPaths($routes);
+        $spec['components']['schemas'] = $this->getDefinitions($routes);
 
         return $spec;
     }
 
-    public function getTags($rows){
+    public function getTags($routes){
+
         $tags = [];
-        foreach ($rows as $row){
-            if (isset($row['tags'])){
-                foreach ($row['tags'] as $tag){
-                    $tags[] = $tag;
-                }
+        foreach ($routes as $route){
+            $route_tags = $this->TypeHintService->getMethodTags($route);
+            foreach ($route_tags as $tag){
+                $tags[] = $tag;
             }
         }
         $tags = array_unique($tags);
@@ -323,59 +343,7 @@ class DocBuilder
         return $out;
     }
 
-    public function parseMethodDocComment(string $docComment) {
-        $response = (object)[
-            'summary' => '',
-            'description' => '',
-            'params' => [
-
-            ],
-            'response_model' => (object)[
-                'description' => '',
-                'type' => 'string',
-                'item' => null, // if type is array
-            ]
-        ];
-
-        if (!$docComment) {
-            $response['return'] = null;
-            return $response;
-        }
-
-        $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
-        $docblock = $factory->create($docComment);
-        $response->summary = $docblock->getSummary();
-        $response->description = $docblock->getDescription()->getBodyTemplate();
-        
-        foreach($docblock->getTags() as $tag){
-            if ('param' == $tag->getName()){
-                $name = $tag->getVariableName();
-                if ($name){
-                    $response->params[$name] = (object)[
-                        'type' => $tag->getType()->__toString(),
-                        'description' => $tag->getDescription()->getBodyTemplate(),
-                    ];
-                    
-                }
-            }
-            if ('return' == $tag->getName()){
-                $response->response_model->description = $tag->getDescription()->getBodyTemplate();
-                $type = $tag->getType();
-                if ('phpDocumentor\Reflection\Types\Array_' == get_class($type)){
-                    $response->response_model->type = 'array';
-                    $valueType = $type->getValueType();
-                    if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
-                        $response->response_model->item = $type->getValueType()->getFqsen()->getName();
-                    } else {
-                        $response->response_model->item = $valueType->__toString();
-                    }
-                } 
-            }
-        }
-        
-        return $response;
-        
-    }
+    
 
 
 }

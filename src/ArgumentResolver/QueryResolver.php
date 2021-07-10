@@ -14,18 +14,21 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Akuehnis\SymfonyApi\Services\DocBlockService;
 
 
 class QueryResolver implements ArgumentValueResolverInterface
 {
     private $security;
     private $Validator;
+    private $DocBlockService;
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
-    public function __construct(ValidatorInterface $Validator)
+    public function __construct(ValidatorInterface $Validator, DocBlockService $DocBlockService)
     {
         $this->Validator = $Validator;
+        $this->DocBlockService = $DocBlockService;
     }
 
     public function supports(Request $request, ArgumentMetadata $argument)
@@ -34,7 +37,7 @@ class QueryResolver implements ArgumentValueResolverInterface
         if (!in_array($type, $this->base_types)) {
             return false;
         }
-        
+
         return true;
     }
 
