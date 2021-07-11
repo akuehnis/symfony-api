@@ -14,21 +14,21 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Akuehnis\SymfonyApi\Services\DocBlockService;
+use Akuehnis\SymfonyApi\Services\DocBuilder;
 
 
 class QueryResolver implements ArgumentValueResolverInterface
 {
     private $security;
     private $Validator;
-    private $DocBlockService;
+    private $DocBuilder;
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
-    public function __construct(ValidatorInterface $Validator, DocBlockService $DocBlockService)
+    public function __construct(ValidatorInterface $Validator, DocBuilder $DocBuilder)
     {
         $this->Validator = $Validator;
-        $this->DocBlockService = $DocBlockService;
+        $this->DocBuilder = $DocBuilder;
     }
 
     public function supports(Request $request, ArgumentMetadata $argument)
@@ -44,15 +44,19 @@ class QueryResolver implements ArgumentValueResolverInterface
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
-        if (in_array($type, $this->base_types)){
+        $routeName = $request->attributes->get('_route');
+        if (!$routeName){
+            return;
+        }
+        $route = $this->DocBuilder->getRouteByName($routeName);
+        $parameter_models = $this->DocBuilder->getParameterModels($route);
+        if (isset($parameter_models[$argument->getName()])){
             $val = $request->query->get($argument->getName());
-            if (null === $val && !$argument->isNullable() && $argument->hasDefaultValue()){
-                yield $argument->getDefaultValue();
-            } else if ('bool' == $type && in_array(trim(strtolower($val)), ['false', '0', ''] )){
-                yield false;
+            if (null === $val && $parameter_models[$argument->getName()]->has_default){
+                yield $parameter_models[$argument->getName()]->default;
             } else {
                 yield $val;
             }
-        }       
+        }
     }
 }

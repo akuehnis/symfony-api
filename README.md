@@ -157,7 +157,7 @@ public function testhello(string $group, string $search): Response
 
 ### Query parameter with default value
 
-If a query parameter, set a default value.
+If a query parameter shall be optional, set a default value.
 
 ```
 /**

@@ -2,30 +2,55 @@
 namespace Akuehnis\SymfonyApi\Services;
 
 use Akuehnis\SymfonyApi\Models\ParaModel;
+use Akuehnis\SymfonyApi\Services\RouteService;
 
-class DocBlockService {
+class DocBlockService 
+{
 
-    public function getDocblock(string $docComment) 
+    protected $RouteService;
+
+    public function __construct(RouteService $RouteService)
     {
+        $this->RouteService = $RouteService;
+    }
+
+    /**
+     * @param Object $route Symfony Route Object
+     * @return string comment block
+     */
+    public function getDocComment($route)
+    {
+        $reflection = $this->RouteService->getMethodReflection($route);
+        $docComment = $reflection  ? $reflection->getDocComment() : null;
+        return $docComment;
+
+    }
+
+    public function getDocblock($route) 
+    {
+        $docComment = $this->getDocComment($route);
+        if (!$docComment){
+            return null;
+        }
         $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
         return $factory->create($docComment);
     }
 
-    public function getMethodSummary(string $docComment)
+    public function getMethodSummary($route)
     {
-        $docblock = $this->getDocblock($docComment);
+        $docblock = $this->getDocblock($route);
         return $docblock->getSummary();
     }
 
-    public function getMethodDescription(string $docComment) 
+    public function getMethodDescription($route) 
     {
-        $docblock = $this->getDocblock($docComment);
+        $docblock = $this->getDocblock($route);
         return $docblock->getDescription()->getBodyTemplate();
     }
 
-    public function getMethodReturnTag(string $docComment)
+    public function getMethodReturnTag($route)
     {
-        $docblock = $this->getDocblock($docComment);
+        $docblock = $this->getDocblock($route);
         foreach($docblock->getTags() as $tag){
             if ('return' == $tag->getName()){
                 return $tag;
@@ -36,9 +61,9 @@ class DocBlockService {
 
     }
 
-    public function getMethodReturnModel(string $docComment)
+    public function getMethodReturnModel($route)
     {
-        $tag = $this->getMethodReturnTag($docComment);
+        $tag = $this->getMethodReturnTag($route);
         if (null === $tag){
             return null;
         }
@@ -62,9 +87,12 @@ class DocBlockService {
 
     }
 
-    public function getParameters(string $docComment) 
+    public function getParameterModels($route) 
     {
-        $docblock = $this->getDocblock($docComment);
+        $docblock = $this->getDocblock($route);
+        if (!$docblock){
+            return [];
+        }
         $params = [];
         foreach($docblock->getTags() as $tag){
             if ('param' == $tag->getName()){
@@ -92,9 +120,9 @@ class DocBlockService {
         return $params;
     }
 
-    public function getClasses($docComment){
-        $parameters = $this->getParameters($docComment);
-        $returnModel = $this->getMethodReturnModel($docComment);
+    public function getClasses($route){
+        $parameters = $this->getParameterModels($route);
+        $returnModel = $this->getMethodReturnModel($route);
         $models = [];
         foreach ($parameters as $name => $param){
             $type = $param->type;

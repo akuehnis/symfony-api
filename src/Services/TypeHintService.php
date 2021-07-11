@@ -3,30 +3,24 @@ namespace Akuehnis\SymfonyApi\Services;
 
 use Doctrine\Common\Annotations\AnnotationReader;
 use Akuehnis\SymfonyApi\Models\ParaModel;
+use Akuehnis\SymfonyApi\Services\RouteService;
 
 class TypeHintService {
 
-    public function getMethodReflection($route){
-        $defaults = $route->getDefaults();
-        if (!isset($defaults['_controller']) || false === strpos($defaults['_controller'], '::')){
-            return null;
-        }
-        list($class, $method) = explode('::', $defaults['_controller']);
-        if (!class_exists($class)){
-            return null;
-        }
-        $reflection = new \ReflectionMethod($class, $method);
-        return $reflection;
+    protected $RouteService;
 
+    public function __construct(RouteService $RouteService)
+    {
+        $this->RouteService = $RouteService;
     }
     
     public function getMethodTags($route) {
-        $reflection = $this->getMethodReflection($route);
+        $reflection = $this->RouteService->getMethodReflection($route);
         if (null === $reflection){
             return null;
         }
         $annotationReader = new AnnotationReader();
-        $annotations = $annotationReader->getMethodAnnotations($reflection );
+        $annotations = $annotationReader->getMethodAnnotations($reflection);
         $tags = [];
         foreach ($annotations as $annotation) {
             if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
@@ -39,7 +33,7 @@ class TypeHintService {
     
     public function getMethodReturnModel($route)
     {
-        $reflection = $this->getMethodReflection($route);
+        $reflection = $this->RouteService->getMethodReflection($route);
         if (null === $reflection){
             return null;
         }
@@ -51,11 +45,11 @@ class TypeHintService {
         return $param;
     }
 
-    public function getParameters($route) 
+    public function getParameterModels($route) 
     {
-        $reflection = $this->getMethodReflection($route);
+        $reflection = $this->RouteService->getMethodReflection($route);
         if (null === $reflection){
-            return null;
+            return [];
         }
         $parameters = $reflection->getParameters();
         $list = [];
@@ -70,8 +64,9 @@ class TypeHintService {
                 $list[$name]->location = 'body';
             }
             $list[$name]->type = $parameter->getType()->getName();
-            $list[$name]->required = !$parameter->isOptional();
+            $list[$name]->required = !$parameter->isDefaultValueAvailable();
             $list[$name]->has_default = $parameter->isDefaultValueAvailable();
+            $list[$name]->is_nullable = $parameter->isDefaultValueAvailable() && null === $parameter->getDefaultValue();
             if ($parameter->isDefaultValueAvailable()){
                 $list[$name]->default = $parameter->getDefaultValue();
             }
@@ -81,7 +76,7 @@ class TypeHintService {
     }
 
     public function getClasses($route){
-        $parameters = $this->getParameters($route);
+        $parameters = $this->getParameterModels($route);
         $returnModel = $this->getMethodReturnModel($route);
         $models = [];
         foreach ($parameters as $name => $param){

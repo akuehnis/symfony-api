@@ -12,6 +12,8 @@ class ParaModel
 
     public $required;
 
+    public $is_nullable;
+
     public $has_default;
 
     public $default;
