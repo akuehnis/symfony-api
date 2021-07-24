@@ -24,7 +24,10 @@ return [
 
 ### Openapi UI
 
-To see swagger - ui
+If Swagger-UI is required, add a route of your choice in your routes.yaml 
+with a controller pointing to akuehnis.symfony_api.controller.doc_ui.
+
+Example:
 
 ```
 # config/routes.yaml
@@ -43,7 +46,11 @@ bin/console assets:install
 
 ### Openapi JSON
 
-To get json:
+If Openapi JSON is required, add a route of your choice in your routes.yaml 
+with a controller pointing to akuehnis.symfony_api.controller.doc_json. 
+
+Example: 
+
 ```
 # config/routes.yaml
 app.swagger:
@@ -93,7 +100,6 @@ For documentation, PHPDoc-Comments will be used (see exmple below).
 // src/Controller/DefaultController.php
 namespace App\Controller
 
-use Akuehnis\SymfonyApi\Annotations\Tag as DocuTag;
 use App\Schemas\MyOutputModel;
 
 class DefaultController
@@ -103,7 +109,7 @@ class DefaultController
      * 
      * Further lines will be the endpoint description.
      *
-     * @DocuTag(name="abrakadabra")
+     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
      * @Route("/hello/{name}", name="app_hello", methods={"GET"})
      * 
      * @param string $name This is the description for the parameter 'name'
@@ -139,6 +145,7 @@ it will be validated and injected by SymfonyApi automatically.
 
 ```
 /**
+  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
   * @Route("/testhello/{group}", name="app_testhello", methods={"GET"})
 */
 public function testhello(string $group, string $search): Response
@@ -161,6 +168,7 @@ If a query parameter shall be optional, set a default value.
 
 ```
 /**
+  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
   * @Route("/testfloatdefault", name="app_testfloatdefault", methods={"GET"})
 */
 public function testfloat(float $number = 22.45): Response
@@ -176,6 +184,7 @@ Allow a parameter to be NULL by setting default value to NULL.
 
 ```
 /**
+  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
   * @Route("/teststringnull", name="app_teststringnull", methods={"GET"})
 */
 public function teststringnull(string $myname = NULL): Response
@@ -192,6 +201,7 @@ If a parameter is required, then do not preset neither a default value nor NULL.
 
 ```
 /**
+  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
   * @Route("/testrequired", name="app_testrequired", methods={"GET"})
 */
 public function testrequired(int $quantity): Response
@@ -208,9 +218,10 @@ public function testrequired(int $quantity): Response
 Symfony-Api does treat the following values as 'false':
     * false
     * 0
-    * empty string
 
-All other values will be 'true'
+Symfony-Api does treat the following values as 'true':
+    * true
+    * 1
 
 ```
 /**
@@ -219,12 +230,10 @@ All other values will be 'true'
 public function testbool(bool $activated = true): Response
 {
     /* 
-       /testbool?activated=true: true
-       /testbool?activated=1:    true
-       /testbool?activated=null: true
-       /testbool?activated=:     false
-       /testbool?activated=0:    false
-       /testbool?activated=false:false
+       /testbool?activated=true:  true
+       /testbool?activated=1:     true
+       /testbool?activated=false: false
+       /testbool?activated=0:     false
     */
 }
 ```
@@ -252,20 +261,20 @@ class MyInputModel extends ApiBaseModel {
     }
 
     /**
-     * @Assert\NotBlank
+     * @var string $name This is the name
      */
     public string $name;
 
     /**
-     * @Assert\NotBlank
+     * This will be the description a no @var-Tag is present
      */
     public int $counter;
 
 }
 ```
 
-In the controller, add an Argument type hinted with your Input Model. Body will automatically be
-parsed and validated.
+In the controller, add an Argument type hinted with your Input Model. 
+Body will automatically beparsed and validated.
 
 ```
 <?php
@@ -281,6 +290,7 @@ use App\Schemas\MyInputModel;
 class DefaultController
 {
     /**
+     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
      * @Route("/testpatch/{id}", name="app_testpatch", methods={"PATCH"})
      */
     public function testpatch(int $id, MyInputModel $model): Response
@@ -334,6 +344,7 @@ use App\Schemas\MyOutputModel;
 class DefaultController
 {
     /**
+     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
      * @Route("/testoutput, name="app_testoutput", methods={"GET"})
      */
     public function testoutput(int $id, MyInputModel $model): MyOutputModel
