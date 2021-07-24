@@ -3,19 +3,19 @@
 namespace Akuehnis\SymfonyApi\EventSubscriber;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpKernel\Event\ExceptionEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\HttpFoundation\Response;
-
-use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
-use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
-use Symfony\Component\Serializer\Serializer;
-
+use Akuehnis\SymfonyApi\Services\DocBuilder;
 
 class ResponseSubscriber implements EventSubscriberInterface
 {
+
+    protected $DocBuilder;
+
+    public function __construct(DocBuilder $DocBuilder)
+    {
+        $this->DocBuilder = $DocBuilder;
+    }
+
     public static function getSubscribedEvents()
     {
         // return the subscribed events, their methods and priorities
@@ -27,16 +27,21 @@ class ResponseSubscriber implements EventSubscriberInterface
 
     public function onKernelView($event)
     {
+        $request = $event->getRequest();
         $value = $event->getControllerResult();
         if (is_object($value) && is_subclass_of($value, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
-            $encoders = [new JsonEncoder()];
-            // Achtung, Reihenfolge der Serializer ist entscheidend!
-            $normalizers = [
-                new DateTimeNormalizer(),
-                new ObjectNormalizer()
-            ];
-            $serializer = new Serializer($normalizers, $encoders);
-            $jsonContent = $serializer->serialize($value, 'json');
+            $classname = get_class($value);
+            $class_property_models = $this->DocBuilder->getPropertyModels($classname);
+            $output = [];
+            foreach ($class_property_models as $name->$property){
+                $type = $property->type;
+                if ('DateTime' == $type){
+                    $output[$name] = $value->{$name}->format('c');
+                } else {
+                    $output[$name] = $value->{$name};
+                }
+            }
+            $jsonContent = json_encode($output);
             $response = new Response($jsonContent, 200, ['Content-Type' => 'application/json']);
             $event->setResponse($response);
         }

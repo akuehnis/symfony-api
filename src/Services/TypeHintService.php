@@ -45,7 +45,13 @@ class TypeHintService {
         return $param;
     }
 
-    public function getParameterModels($route) 
+    /**
+     * Return Paramodels for route parameters 
+     * 
+     * @param Route $route Symfony Route 
+     * @return ParaModel[] array of Paramodels
+     */
+    public function getRouteParameterModels($route) 
     {
         $reflection = $this->RouteService->getMethodReflection($route);
         if (null === $reflection){
@@ -75,8 +81,37 @@ class TypeHintService {
         return $list;
     }
 
+    /**
+     * Return Paramodel for class properties
+     * 
+     * @param string $classname 
+     * @return ParaModel[] array of Paramodels
+     */
+    public function getClassPropertyModels($classname)
+    {
+        $class_vars = get_class_vars($classname);
+        $reflection = new \ReflectionClass($classname);
+        $list = [];
+        foreach ($reflection->getProperties() as $property){
+            //ReflectionProperty::hasDefaultValue() erst ab PHP 8
+            $name = $property->getName();
+            $list[$name] = new ParaModel();
+            $list[$name]->location = $classname;
+            $list[$name]->name = $name;
+            $list[$name]->type = $property->hasType() ? $property->getType()->getName() : null;
+            $list[$name]->required = isset($class_vars[$name]);
+            $list[$name]->has_default = isset($class_vars[$name]);
+            $list[$name]->is_nullable = true; // todo - maybe with PHP 8 only?
+            if (isset($class_vars[$name])){
+                $list[$name]->default = $class_vars[$name];
+            }
+        }
+
+        return $list;
+    }
+
     public function getClasses($route){
-        $parameters = $this->getParameterModels($route);
+        $parameters = $this->getRouteParameterModels($route);
         $returnModel = $this->getMethodReturnModel($route);
         $models = [];
         foreach ($parameters as $name => $param){

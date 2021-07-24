@@ -15,7 +15,7 @@ class Configuration implements ConfigurationInterface
                 ->arrayNode('documentation')
                     ->useAttributeAsKey('key')
                     ->info('The documentation used as base')
-                    ->example(['info' => ['title' => 'My App']])
+                    ->example(['info' => ['title' => 'My Awesome API']])
                     ->prototype('variable')->end()
                 ->end()
             ->end()

@@ -13,24 +13,24 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Akuehnis\SymfonyApi\Services\DocBuilder;
 
 
 class QueryResolver implements ArgumentValueResolverInterface
 {
     private $security;
-    private $Validator;
     private $DocBuilder;
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
-    public function __construct(ValidatorInterface $Validator, DocBuilder $DocBuilder)
+    public function __construct(DocBuilder $DocBuilder)
     {
-        $this->Validator = $Validator;
         $this->DocBuilder = $DocBuilder;
     }
 
+    /**
+     * check if the parameter type is supported
+     */
     public function supports(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
@@ -41,6 +41,9 @@ class QueryResolver implements ArgumentValueResolverInterface
         return true;
     }
 
+    /**
+     * Resolves the controller method parameters
+     */
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
@@ -49,7 +52,7 @@ class QueryResolver implements ArgumentValueResolverInterface
             return;
         }
         $route = $this->DocBuilder->getRouteByName($routeName);
-        $parameter_models = $this->DocBuilder->getParameterModels($route);
+        $parameter_models = $this->DocBuilder->getRouteParameterModels($route);
         if (isset($parameter_models[$argument->getName()])){
             $val = $request->query->get($argument->getName());
             if (null === $val && $parameter_models[$argument->getName()]->has_default){

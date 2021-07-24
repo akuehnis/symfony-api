@@ -18,16 +18,17 @@
         </service>
         
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
-            <tag name="controller.argument_value_resolver" priority="50"/>
-            <argument type="service" id="Symfony\Component\Validator\Validator\ValidatorInterface" />
             <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
+            <tag name="controller.argument_value_resolver" priority="50"/>
         </service>
 
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\BodyResolver">
+            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
             <tag name="controller.argument_value_resolver" priority="50"/>
         </service>
 
         <service id="Akuehnis\SymfonyApi\EventSubscriber\ResponseSubscriber">
+            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
             <tag name="kernel.event_subscriber" />
         </service>
 

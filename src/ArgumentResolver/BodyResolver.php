@@ -8,18 +8,15 @@ use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadata;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
-
-use Symfony\Component\Validator\Validator\ValidatorInterface;
-
+use Akuehnis\SymfonyApi\Services\DocBuilder;
 class BodyResolver implements ArgumentValueResolverInterface
 {
     private $security;
-    private $Validator;
-    private $base_types =  ['string', 'int', 'float', 'bool'];
+    private $DocBuilder;
 
-    public function __construct(ValidatorInterface $Validator)
+    public function __construct(DocBuilder $DocBuilder)
     {
-        $this->Validator = $Validator;
+        $this->DocBuilder = $DocBuilder;
     }
 
     public function supports(Request $request, ArgumentMetadata $argument)
@@ -36,69 +33,22 @@ class BodyResolver implements ArgumentValueResolverInterface
     {
         $classname = $argument->getType();
         $obj = new $classname();
+        $property_models = $this->DocBuilder->getClassPropertyModels($classname);
         $data = json_decode($request->getContent(), true);
         $submitted_data = [];
-        if (null === $data){
-            http_response_code(400);
-            header('Conent-Type:application/json');
-            echo json_encode(json_encode(['detail' => 'Could not parse body']));
-            die();
-        }
-
-        https://symfony.com/doc/current/components/property_info.html
-        $phpDocExtractor = new PhpDocExtractor();
-        $reflectionExtractor = new ReflectionExtractor();
-        $listExtractors = [$reflectionExtractor];
-        $typeExtractors = [$phpDocExtractor, $reflectionExtractor];
-        $descriptionExtractors = [$phpDocExtractor];
-        $accessExtractors = [$reflectionExtractor];
-        $propertyInitializableExtractors = [$reflectionExtractor];
-
-        $propertyInfo = new PropertyInfoExtractor(
-            $listExtractors,
-            $typeExtractors,
-            $descriptionExtractors,
-            $accessExtractors,
-            $propertyInitializableExtractors
-        );
         foreach ($data as $key => $val){
-            if (!property_exists($obj, $key)){
-                continue;
-            }
-            $types = $propertyInfo->getTypes($classname, $key);
-            $type = array_shift($types);
-            if ($type) {
-                if (in_array($type->getBuiltinType(), $this->base_types)){
-                    settype($val, $type->getBuiltinType());
-                } else if ('DateTime' == $type->getClassName()){
+            if (isset($property_models[$key])) {
+                $type = $property_models[$key]->type;
+                if ('DateTime' == $type){
                     $val = new \DateTime($val);
+                } else {
+                    settype($val, $type);
                 }
             }
             $obj->{$key} = $val;
             $submitted_data[$key] = $val;
         }
-
         $obj->storeSubmittedData($submitted_data);
-
-        $errors = $this->Validator->validate($obj);
-
-        if (0 < count($errors)){
-            $error_data = [];
-            foreach ($errors as $error){
-                $property_path = $error->getPropertyPath();
-                if (!isset($error_data[$property_path])) {
-                    $error_data[$property_path] = [];
-                }
-                $error_data[$property_path][] = $error->getMessage();
-            }
-            http_response_code(400);
-            header('Content-Type:application/json');
-            echo json_encode(json_encode([
-                'detail' => 'Bad Request',
-                'errors' => $error_data,
-            ]));
-            die();
-        }
 
         yield $obj;
     }

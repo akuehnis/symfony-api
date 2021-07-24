@@ -93,7 +93,7 @@ class DocBuilder
             });
 
             $parameters = [];
-            foreach ($this->getParameterModels($route) as $param_name => $parameter_model) {
+            foreach ($this->getRouteParameterModels($route) as $param_name => $parameter_model) {
                 if ('body' == $parameter_model->location){
                     // will be used below, see request_body
                     continue;
@@ -209,7 +209,7 @@ class DocBuilder
 
             $body_model = null;
             $request_body = null;
-            foreach ($this->getParameterModels($route) as $param_name => $param_model) {
+            foreach ($this->getRouteParameterModels($route) as $param_name => $param_model) {
                 if ('body' == $param_model->location){
                     $body_model = $param_model;
                 }
@@ -290,9 +290,9 @@ class DocBuilder
      * 
      * @return ParamModel[] Merged Models
      */
-    public function getParameterModels($route){
-        $params_typehint =  $this->TypeHintService->getParameterModels($route);
-        $params_docblock =  $this->DocBlockService->getParameterModels($route);
+    public function getRouteParameterModels($route){
+        $params_typehint =  $this->TypeHintService->getRouteParameterModels($route);
+        $params_docblock =  $this->DocBlockService->getRouteParameterModels($route);
         foreach ($params_typehint as $name => $model){
             if (!isset($params_docblock[$name])){
                 continue;
@@ -303,6 +303,33 @@ class DocBuilder
             }
         }
         return $params_typehint;
+    }
+
+    /**
+     * Collects properties from Typehinting and Docblock and merges
+     * 
+     * The models will be used for validation purposes. For Openapi see getDefinitionOfClass method.
+     * 
+     * @return ParamModel[] Merged Models
+     */
+    public function getClassPropertyModels($classname){
+        $properties_typehint =  $this->TypeHintService->getClassPropertyModels($classname);
+        $properties_docblock =  $this->DocBlockService->getClassPropertyModels($classname);
+        foreach ($properties_typehint as $name => $model){
+            if (!isset($properties_docblock[$name])){
+                continue;
+            }
+            $properties_typehint[$name]->description = $properties_docblock[$name]->description;
+            if (null === $model->type) {
+                // typehint model wird erst ab PHP8 verfügbar sein
+                $model->type = $properties_docblock[$name]->type;
+            }
+            if ('array' == $model->type) {
+                $model->items = $properties_docblock[$name]->items;
+            }
+        }
+
+        return $properties_typehint;
     }
 
     public function getReturnModel($route)
@@ -319,74 +346,25 @@ class DocBuilder
     }
 
     
-
-
-    public function getDefinitionOfClass($classname) {
-        https://symfony.com/doc/current/components/property_info.html
-        $phpDocExtractor = new PhpDocExtractor();
-        $reflectionExtractor = new ReflectionExtractor();
-        $listExtractors = [$reflectionExtractor];
-        $typeExtractors = [$phpDocExtractor, $reflectionExtractor];
-        $descriptionExtractors = [$phpDocExtractor];
-        $accessExtractors = [$reflectionExtractor];
-        $propertyInitializableExtractors = [$reflectionExtractor];
-
-        $propertyInfo = new PropertyInfoExtractor(
-            $listExtractors,
-            $typeExtractors,
-            $descriptionExtractors,
-            $accessExtractors,
-            $propertyInitializableExtractors
-        );
+    /**
+     * Returns openapi definition of a class name
+     * 
+     * @param string $classname Name of the class
+     * @return mixed type object with properties
+     */
+    public function getDefinitionOfClass($classname) 
+    {  
         $def = [
             'type' => 'object',
             'properties' => [],
         ];
-
-        
-        $properties = $propertyInfo->getProperties($classname);
-        foreach ($properties as $key){
-            $types = $propertyInfo->getTypes($classname, $key);
-            if (null === $types){
-                continue;
-                // Todo: if any of Response, JsonResponse or similar, create it's definition
-            }
-            $type = array_shift($types);
-            if ($type) {
-                if ('float' == $type->getBuiltinType()) {
-                    $def['properties'][$key] = [
-                        'type' => 'number',
-                        'format' => 'float'
-                    ];
-                } else if ('int' == $type->getBuiltinType()) {
-                    $def['properties'][$key] = [
-                        'type' => 'number',
-                        'format' => 'integer'
-                    ];
-                } else if ('bool' == $type->getBuiltinType()) {
-                    $def['properties'][$key] = [
-                        'type' => 'boolean',
-                    ];
-                } else if ('string' == $type->getBuiltinType()) {
-                    $def['properties'][$key] = [
-                        'type' => 'string',
-                    ];
-                } else if ('DateTime' == $type->getClassName()){
-                    $def['properties'][$key] = [
-                        'type' => 'string',
-                        'format' => 'date-time'
-                    ];
-                } else if ('array' == $type->getBuiltinType()){
-                    // Todo: noch nicht korrekt. additionalProperties, siehe hier
-                    // https://swagger.io/docs/specification/data-models/dictionaries/
-                    $def['properties'][$key] = [
-                        'type' => 'array',
-                        'items' => [
-                            'type' => 'string'
-                        ]
-                    ];
-                } 
-            }
+        foreach ($this->getClassPropertyModels($classname) as $name=>$prop_model){
+            // do not touche original model used by request validator
+            $openapi_prop = clone($prop_model); 
+            list($type, $format) = $prop_model->type;
+            $openapi_prop->type = $type;
+            $openapi_prop->format = $format;
+            $def['properties'][$name] = $openapi_prop;
         }
         return $def;
 
@@ -402,6 +380,9 @@ class DocBuilder
             $format = 'float';
         } else if ('bool' == $type){
             $type = 'boolean';
+        } else if ('DateTime' == $type){
+            $type = 'string';
+            $format = 'date-time';
         }
 
         return [$type, $format];

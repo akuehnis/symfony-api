@@ -87,7 +87,56 @@ class DocBlockService
 
     }
 
-    public function getParameterModels($route) 
+    /**
+     * Return Paramodel for class properties
+     * 
+     * @param string $classname 
+     * @return ParaModel[] array of Paramodels
+     */
+    public function getClassPropertyModels($classname)
+    {
+        $reflection = new \ReflectionClass($classname);
+        $list = [];
+        foreach ($reflection->getProperties() as $property){
+            $name = $property->getName();
+            $docComment = $property->getDocComment();
+            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+            $docblock = $factory->create($docComment);
+            $list[$name] = new ParaModel();
+            $list[$name]->location = $classname;
+            $list[$name]->name = $name;
+            $list[$name]->description = $docblock->getSummary();
+            $list[$name]->type = null;
+            
+            foreach($docblock->getTags() as $tag){
+                if ('var' == $tag->getName()){
+                    $description = $tag->getDescription()->getBodyTemplate();
+                    if ($description) {
+                        // If  available overwrite with variable description
+                        $list[$name]->description = $description;
+                    }
+                    $tagType = $tag->getType();
+                    if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
+                        $list[$name]->type = 'array';
+                        $list[$name]->items = new ParaModel();
+                        $valueType = $tagType->getValueType();
+                        if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
+                            $list[$name]->items->type = $valueType->getValueType()->getFqsen()->getName();
+                        } else {
+                            $list[$name]->items->type = $valueType->__toString();
+                        }
+                    } else {
+                        $list[$name]->type = $tagType->__toString();
+                    }
+                    
+                }
+            }
+        }
+
+        return $list;
+    }
+
+    public function getRouteParameterModels($route) 
     {
         $docblock = $this->getDocblock($route);
         if (!$docblock){
@@ -121,7 +170,7 @@ class DocBlockService
     }
 
     public function getClasses($route){
-        $parameters = $this->getParameterModels($route);
+        $parameters = $this->getRouteParameterModels($route);
         $returnModel = $this->getMethodReturnModel($route);
         $models = [];
         foreach ($parameters as $name => $param){
