@@ -316,19 +316,22 @@ class DocBuilder
         $properties_typehint =  $this->TypeHintService->getClassPropertyModels($classname);
         $properties_docblock =  $this->DocBlockService->getClassPropertyModels($classname);
         foreach ($properties_typehint as $name => $model){
+            
             if (!isset($properties_docblock[$name])){
                 continue;
             }
-            $properties_typehint[$name]->description = $properties_docblock[$name]->description;
+            if ($properties_docblock[$name]->description){
+                $properties_typehint[$name]->description = $properties_docblock[$name]->description;
+            }
             if (null === $model->type) {
                 // typehint model wird erst ab PHP8 verfügbar sein
                 $model->type = $properties_docblock[$name]->type;
             }
-            if ('array' == $model->type) {
+            if ('array' == $model->type && is_object($properties_docblock[$name]->items)) {
+                // Wenn nur typehint und kein docblock, dann kann items auch mal null sein
                 $model->items = $properties_docblock[$name]->items;
             }
         }
-
         return $properties_typehint;
     }
 
@@ -360,10 +363,36 @@ class DocBuilder
         ];
         foreach ($this->getClassPropertyModels($classname) as $name=>$prop_model){
             // do not touche original model used by request validator
-            $openapi_prop = clone($prop_model); 
-            list($type, $format) = $prop_model->type;
-            $openapi_prop->type = $type;
-            $openapi_prop->format = $format;
+            list($type, $format) = $this->getTypeAndFormat($prop_model->type);
+            $openapi_prop = (object)[
+                'type' => $type,
+            ];
+            if ($format){
+                $openapi_prop->format = $format;
+            }
+            if ($prop_model->description){
+                $openapi_prop->description = $prop_model->description;
+            }
+            if ($prop_model->is_nullable){
+                $openapi_prop->nullable = true;
+            }
+            if ($prop_model->has_default){
+                $openapi_prop->default = $prop_model->default;
+            }
+            if ('array' == $type){
+                if (is_object($prop_model->items) && null !== $prop_model->items->type){
+                    if (in_array($prop_model->items->type, ['bool', 'float', 'string', 'int'])){
+                        $openapi_prop->items = $prop_model->items->type;
+                    } else {
+                        $reflect = new \ReflectionClass($prop_model->items->type);
+                        $openapi_prop->items = [
+                            '$ref' => '#/components/schemas/' . $reflect->getShortName(),
+                        ];
+                    }
+                } else {
+                    $openapi_prop->items = (object)[]; // Any type
+                }
+            }
             $def['properties'][$name] = $openapi_prop;
         }
         return $def;

@@ -41,7 +41,9 @@ class TypeHintService {
 
         $param = new ParaModel();
         $param->type = null === $returnType ? 'string' : $reflection->getReturnType()->getName();
-
+        if ('array' == $param->type){
+            $param->items = new ParaModel();
+        }
         return $param;
     }
 
@@ -60,6 +62,10 @@ class TypeHintService {
         $parameters = $reflection->getParameters();
         $list = [];
         foreach ($parameters as $parameter){
+            $type = $parameter->getType()->getName();
+            if (!in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
+                continue;
+            }
             $name = $parameter->getName();
             $list[$name] = new ParaModel();
             $list[$name]->location = 'query';
@@ -69,13 +75,17 @@ class TypeHintService {
             } else if (is_subclass_of($parameter->getType()->getName(), 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                 $list[$name]->location = 'body';
             }
-            $list[$name]->type = $parameter->getType()->getName();
+            $list[$name]->type = $type;
+            if ('array' ==  $list[$name]->type){
+                $list[$name]->items = new ParaModel();
+            }
             $list[$name]->required = !$parameter->isDefaultValueAvailable();
             $list[$name]->has_default = $parameter->isDefaultValueAvailable();
             $list[$name]->is_nullable = $parameter->isDefaultValueAvailable() && null === $parameter->getDefaultValue();
             if ($parameter->isDefaultValueAvailable()){
                 $list[$name]->default = $parameter->getDefaultValue();
             }
+
         }
 
         return $list;
@@ -99,6 +109,9 @@ class TypeHintService {
             $list[$name]->location = $classname;
             $list[$name]->name = $name;
             $list[$name]->type = $property->hasType() ? $property->getType()->getName() : null;
+            if ('array' ==  $list[$name]->type){
+                $list[$name]->items = new ParaModel();
+            }
             $list[$name]->required = isset($class_vars[$name]);
             $list[$name]->has_default = isset($class_vars[$name]);
             $list[$name]->is_nullable = true; // todo - maybe with PHP 8 only?

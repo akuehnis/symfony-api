@@ -69,20 +69,21 @@ class DocBlockService
         }
         $res = new ParaModel();
         $res->description = $tag->getDescription()->getBodyTemplate();
+        
         $tagType = $tag->getType();
         if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
             $res->type = 'array';
             $res->items = new ParaModel();
             $valueType = $tagType->getValueType();
             if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
-                $res->items->type = $valueType->getValueType()->getFqsen()->getName();
+                // we need the fully qulified name
+                $res->items->type = $valueType->getFqsen()->__toString();
             } else if ($valueType){
                 $res->items->type = $valueType->__toString();
             }
         } else {
             $res->type = $tagType->__toString();
         }
-
         return $res;
 
     }
@@ -100,6 +101,9 @@ class DocBlockService
         foreach ($reflection->getProperties() as $property){
             $name = $property->getName();
             $docComment = $property->getDocComment();
+            if (false == $docComment){
+                $docComment = '/** */';
+            }
             $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
             $docblock = $factory->create($docComment);
             $list[$name] = new ParaModel();
@@ -121,7 +125,7 @@ class DocBlockService
                         $list[$name]->items = new ParaModel();
                         $valueType = $tagType->getValueType();
                         if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
-                            $list[$name]->items->type = $valueType->getValueType()->getFqsen()->getName();
+                            $list[$name]->items->type = $valueType->getFqsen()->__toString();
                         } else {
                             $list[$name]->items->type = $valueType->__toString();
                         }

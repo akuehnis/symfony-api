@@ -31,9 +31,9 @@ class ResponseSubscriber implements EventSubscriberInterface
         $value = $event->getControllerResult();
         if (is_object($value) && is_subclass_of($value, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
             $classname = get_class($value);
-            $class_property_models = $this->DocBuilder->getPropertyModels($classname);
+            $class_property_models = $this->DocBuilder->getClassPropertyModels($classname);
             $output = [];
-            foreach ($class_property_models as $name->$property){
+            foreach ($class_property_models as $name=>$property){
                 $type = $property->type;
                 if ('DateTime' == $type){
                     $output[$name] = $value->{$name}->format('c');
