@@ -183,6 +183,18 @@ class DocBuilder
                             ]
                         ]
                     ];
+                } else if ($return_model->type == 'Symfony\Component\HttpFoundation\JsonResponse'){
+                    $reflect = new \ReflectionClass($return_model->type);
+                    $responses['200'] = [
+                        'description'=> $return_model->description,
+                        'content' => [
+                            'application/json' => [
+                                'schema' => [
+                                    'type' => 'object',
+                                ]
+                            ]
+                        ]
+                    ];
                 } else {
                     $responses['200'] = [
                         'description'=> $return_model->description,
@@ -269,8 +281,9 @@ class DocBuilder
     public function getDefinitions($routes){
         $definitions = [];
         foreach ($routes as $route){
-            $classes = $this->DocBlockService->getClasses($route);
-            $classes_docblock = $this->TypeHintService->getClasses($route);
+            $classes = $this->TypeHintService->getClasses($route);
+            // Docblock  überschreibt Typehint
+            $classes_docblock = $this->DocBlockService->getClasses($route);
             foreach($classes_docblock as $name => $class_name){
                 $classes[$name] = $class_name;
             }
@@ -282,6 +295,7 @@ class DocBuilder
             }         
         }
         $definitions['Response400'] = $this->getDefinitionOfClass('Akuehnis\SymfonyApi\Models\Response400');
+        $definitions['ErrorModel'] = $this->getDefinitionOfClass('Akuehnis\SymfonyApi\Models\ErrorModel');
         return $definitions;
     }
 
@@ -341,6 +355,9 @@ class DocBuilder
         $return_typehint = $this->TypeHintService->getMethodReturnModel($route);
         if ($return_docblock){
             $return_typehint->description = $return_docblock->description;
+            if (null !== $return_docblock->type){
+                $return_typehint->type = $return_docblock->type;
+            }
             if ('array' == $return_typehint->type){
                 $return_typehint->items = $return_docblock->items;
             }
@@ -382,7 +399,12 @@ class DocBuilder
             if ('array' == $type){
                 if (is_object($prop_model->items) && null !== $prop_model->items->type){
                     if (in_array($prop_model->items->type, ['bool', 'float', 'string', 'int'])){
-                        $openapi_prop->items = $prop_model->items->type;
+                        list($item_type, $item_format) = $this->getTypeAndFormat($prop_model->items->type);
+                        $openapi_prop->items = [];
+                        $openapi_prop->items['type'] = $item_type;
+                        if (null !== $item_format){
+                            $openapi_prop->items['format'] = $item_format;
+                        }
                     } else {
                         $reflect = new \ReflectionClass($prop_model->items->type);
                         $openapi_prop->items = [
@@ -395,10 +417,16 @@ class DocBuilder
             }
             $def['properties'][$name] = $openapi_prop;
         }
-        return $def;
 
+        return $def;
     }
 
+    /**
+     * Convert PHP type to openapi type and format
+     * 
+     * @param string $type
+     * @return mixed 
+     */
     public function getTypeAndFormat($type){
         $type = $type;
         $format = null;
@@ -409,9 +437,10 @@ class DocBuilder
             $format = 'float';
         } else if ('bool' == $type){
             $type = 'boolean';
-        } else if ('DateTime' == $type){
+        } else if ('string' == $type){
             $type = 'string';
-            $format = 'date-time';
+        } else if ('mixed' == $type){
+            $type = (object)[]; // Any Type
         }
 
         return [$type, $format];

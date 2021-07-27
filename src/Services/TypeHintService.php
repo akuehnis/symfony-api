@@ -63,7 +63,7 @@ class TypeHintService {
         $list = [];
         foreach ($parameters as $parameter){
             $type = $parameter->getType()->getName();
-            if (!in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
+            if (!in_array($type, ['bool', 'int', 'string', 'float', 'array', 'mixed'])){
                 continue;
             }
             $name = $parameter->getName();

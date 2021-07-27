@@ -1,11 +1,15 @@
 <?php
 namespace Akuehnis\SymfonyApi\Models;
 
+use Akuehnis\SymfonyApi\Models\ErrorModel;
 
 class Response400
 {
-    public string $detail;
+    public string $detail = '';
 
-    public array $errors;
+    /**
+     * @var array<Akuehnis\SymfonyApi\Models\ErrorModel>
+     */
+    public array $errors = [];
     
 }

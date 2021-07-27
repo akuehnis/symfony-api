@@ -187,7 +187,7 @@ Allow a parameter to be NULL by setting default value to NULL.
   * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
   * @Route("/teststringnull", name="app_teststringnull", methods={"GET"})
 */
-public function teststringnull(string $myname = NULL): Response
+public function teststringnull(?string $myname = NULL): Response
 {
     /* 
         $myname can be string or null.
