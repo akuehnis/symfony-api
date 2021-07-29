@@ -87,7 +87,7 @@ Clear the cache after making any changes.
 ### Add an URL to the Openapi Documentation
 
 Symfony-API will only add routes to the documentation where an annotation of
-Akuehnis\SymfonyApi\Annotations\Tag is present.
+Akuehnis\SymfonyApi\AnnotationsSymfonyApi is present.
 
 The following code snipped shows two controller functions. Both of them will be processed by 
 Symfony-API, however, only the first will be in the documentation because it has the 
@@ -109,7 +109,7 @@ class DefaultController
      * 
      * Further lines will be the endpoint description.
      *
-     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+     * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/hello/{name}", name="app_hello", methods={"GET"})
      * 
      * @param string $name This is the description for the parameter 'name'
@@ -145,7 +145,7 @@ it will be validated and injected by SymfonyApi automatically.
 
 ```
 /**
-  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
   * @Route("/testhello/{group}", name="app_testhello", methods={"GET"})
 */
 public function testhello(string $group, string $search): Response
@@ -168,7 +168,7 @@ If a query parameter shall be optional, set a default value.
 
 ```
 /**
-  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
   * @Route("/testfloatdefault", name="app_testfloatdefault", methods={"GET"})
 */
 public function testfloat(float $number = 22.45): Response
@@ -184,7 +184,7 @@ Allow a parameter to be NULL by setting default value to NULL.
 
 ```
 /**
-  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
   * @Route("/teststringnull", name="app_teststringnull", methods={"GET"})
 */
 public function teststringnull(?string $myname = NULL): Response
@@ -201,7 +201,7 @@ If a parameter is required, then do not preset neither a default value nor NULL.
 
 ```
 /**
-  * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
   * @Route("/testrequired", name="app_testrequired", methods={"GET"})
 */
 public function testrequired(int $quantity): Response
@@ -290,7 +290,7 @@ use App\Schemas\MyInputModel;
 class DefaultController
 {
     /**
-     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+     * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/testpatch/{id}", name="app_testpatch", methods={"PATCH"})
      */
     public function testpatch(int $id, MyInputModel $model): Response
@@ -344,7 +344,7 @@ use App\Schemas\MyOutputModel;
 class DefaultController
 {
     /**
-     * @Akuehnis\SymfonyApi\Annotations\Tag(name="abrakadabra")
+     * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/testoutput, name="app_testoutput", methods={"GET"})
      */
     public function testoutput(int $id, MyInputModel $model): MyOutputModel

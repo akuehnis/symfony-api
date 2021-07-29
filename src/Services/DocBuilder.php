@@ -64,7 +64,7 @@ class DocBuilder
             $annotations = $annotationReader->getMethodAnnotations($reflection );
             $tag = null;
             foreach ($annotations as $annotation) {
-                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
+                if ('Akuehnis\SymfonyApi\Annotations\SymfonyApi' == get_class($annotation)){
                     $routes_of_interest[] = $route;
                     break;
                 }

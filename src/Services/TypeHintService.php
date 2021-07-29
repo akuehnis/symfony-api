@@ -23,8 +23,8 @@ class TypeHintService {
         $annotations = $annotationReader->getMethodAnnotations($reflection);
         $tags = [];
         foreach ($annotations as $annotation) {
-            if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
-                $tags[] = $annotation->name;
+            if ('Akuehnis\SymfonyApi\Annotations\SymfonyApi' == get_class($annotation)){
+                $tags[] = $annotation->tag;
             }
         }
 
@@ -96,6 +96,7 @@ class TypeHintService {
      * 
      * @param string $classname 
      * @return ParaModel[] array of Paramodels
+     * 
      */
     public function getClassPropertyModels($classname)
     {
