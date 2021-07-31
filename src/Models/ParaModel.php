@@ -4,23 +4,24 @@ namespace Akuehnis\SymfonyApi\Models;
 
 class ParaModel
 {
-    public $name;
+    public string $name;
     
-    public $description = ''; // darf nie null sein
+    public string $description = ''; // darf nie null sein
 
-    public $location;
+    public ?string $location = null;
 
-    public $required;
+    public ?bool $required = null;
 
-    public $is_nullable;
+    public ?bool $is_nullable = null;
 
-    public $has_default;
+    public ?bool $has_default = null;
 
-    public $default;
+    public $default = null;
 
-    public $type;
+    public $type = null;
 
-    public $format;
+    public ?string $format = null;
 
-    public $items;
+    public $items = null;
+
 }

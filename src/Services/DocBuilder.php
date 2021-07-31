@@ -8,32 +8,25 @@ use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
-use Akuehnis\SymfonyApi\Services\DocBlockService;
-use Akuehnis\SymfonyApi\Services\TypeHintService;
 use Akuehnis\SymfonyApi\Services\RouteService;
 use Akuehnis\SymfonyApi\Models\Response400;
+use Akuehnis\SymfonyApi\Models\ParaModel;
 
 class DocBuilder
 {
 
     protected $router;
     protected $config_documentation = [];
-    protected $DocBlockService;
-    protected $TypeHintService;
     protected $RouteService;
 
     private $base_types =  ['string', 'int', 'float', 'bool'];
 
     public function __construct(
         UrlGeneratorInterface $UrlGeneratorInterface
-        , DocBlockService $DocBlockService
-        , TypeHintService $TypeHintService
         , RouteService $RouteService
         , $config_documentation
     ){
         $this->router = $UrlGeneratorInterface;
-        $this->DocBlockService = $DocBlockService;
-        $this->TypeHintService = $TypeHintService;
         $this->RouteService = $RouteService;
         $this->config_documentation = $config_documentation;
 
@@ -64,7 +57,7 @@ class DocBuilder
             $annotations = $annotationReader->getMethodAnnotations($reflection );
             $tag = null;
             foreach ($annotations as $annotation) {
-                if ('Akuehnis\SymfonyApi\Annotations\SymfonyApi' == get_class($annotation)){
+                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
                     $routes_of_interest[] = $route;
                     break;
                 }
@@ -80,10 +73,14 @@ class DocBuilder
     public function getPaths($routes){
         $paths = [];
         foreach ($routes as $route) {
+            $reflection = $this->RouteService->getMethodReflection($route);
+            $docComment = $reflection  ? $reflection->getDocComment() : null;
+            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+            $docblock = $factory->create($docComment ? $docComment : '/** */');
             $path = $route->getPath();
-            $tags = $this->TypeHintService->getMethodTags($route);
-            $summary = $this->DocBlockService->getMethodSummary($route);
-            $description = $this->DocBlockService->getMethodDescription($route);
+            $tags = $this->getMethodTags($route);
+            $summary = $docblock ? $docblock->getSummary() : '';
+            $description = $docblock ? $docblock->getDescription()->getBodyTemplate() : '';
             $methods = array_filter($route->getMethods(), function($method){
                 $method = strtolower($method);
                 if (in_array($method, ['options'])) {
@@ -171,7 +168,7 @@ class DocBuilder
                             ]
                         ];
                     }
-                } else if (is_subclass_of($return_model->type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                } else if (method_exists($return_model->type, 'symfonyApiStoreSubmittedData')){
                     $reflect = new \ReflectionClass($return_model->type);
                     $responses['200'] = [
                         'description'=> $return_model->description,
@@ -263,9 +260,16 @@ class DocBuilder
     public function getTags($routes){
         $tags = [];
         foreach ($routes as $route){
-            $route_tags = $this->TypeHintService->getMethodTags($route);
-            foreach ($route_tags as $tag){
-                $tags[] = $tag;
+            $reflection = $this->RouteService->getMethodReflection($route);
+            if (null === $reflection){
+                continue;
+            }
+            $annotationReader = new AnnotationReader();
+            $annotations = $annotationReader->getMethodAnnotations($reflection);
+            foreach ($annotations as $annotation) {
+                if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
+                    $tags[] = $annotation->name;
+                }
             }
         }
         $tags = array_unique($tags);
@@ -278,17 +282,29 @@ class DocBuilder
         return $out;
     }
 
+    public function getMethodTags($route) {
+        $reflection = $this->RouteService->getMethodReflection($route);
+        if (null === $reflection){
+            return null;
+        }
+        $annotationReader = new AnnotationReader();
+        $annotations = $annotationReader->getMethodAnnotations($reflection);
+        $tags = [];
+        foreach ($annotations as $annotation) {
+            if ('Akuehnis\SymfonyApi\Annotations\Tag' == get_class($annotation)){
+                $tags[] = $annotation->name;
+            }
+        }
+
+        return $tags;
+    }
+
     public function getDefinitions($routes){
         $definitions = [];
         foreach ($routes as $route){
-            $classes = $this->TypeHintService->getClasses($route);
-            // Docblock  überschreibt Typehint
-            $classes_docblock = $this->DocBlockService->getClasses($route);
-            foreach($classes_docblock as $name => $class_name){
-                $classes[$name] = $class_name;
-            }
+            $classes = $this->getClasses($route);
             foreach($classes as $class_name){
-                if (is_subclass_of($class_name, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                if (method_exists($class_name, 'symfonyApiStoreSubmittedData')){
                     $reflect = new \ReflectionClass($class_name);
                     $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($class_name);
                 }
@@ -299,24 +315,107 @@ class DocBuilder
         return $definitions;
     }
 
+    public function getClasses($route){
+        $parameters = $this->getRouteParameterModels($route);
+        $returnModel = $this->getReturnModel($route);
+        $models = [];
+        foreach ($parameters as $name => $param){
+            $type = $param->type;
+            if ('array' == $type){
+                $type = $param->items->type;
+            }
+            if (!in_array($type, ['bool', 'int', 'string', 'float'])){
+                $models[$name] = $type;
+            }
+        }
+        if ($returnModel){
+            $type = $returnModel->type;
+            if ('array' == $type && $returnModel->items){
+                $type = $returnModel->items->type;
+            } 
+            if (!in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
+                $models['responseModel'] = $type;
+            }
+
+        }
+
+        return $models;
+    }
+
     /**
      * Collects models from Typehinting and Docblock and merges
      * 
      * @return ParamModel[] Merged Models
      */
     public function getRouteParameterModels($route){
-        $params_typehint =  $this->TypeHintService->getRouteParameterModels($route);
-        $params_docblock =  $this->DocBlockService->getRouteParameterModels($route);
-        foreach ($params_typehint as $name => $model){
-            if (!isset($params_docblock[$name])){
+        $reflection = $this->RouteService->getMethodReflection($route);
+        if (null === $reflection){
+            return [];
+        }
+        $docComment = $reflection->getDocComment();
+        $docblock = null;
+        if ($docComment){
+            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+            $docblock = $factory->create($docComment);
+        }
+        $models = [];
+        foreach ($reflection->getParameters() as $parameter){
+
+            $reflection_type = $parameter->getType();
+            if (!$reflection_type) {
                 continue;
             }
-            $params_typehint[$name]->description = $params_docblock[$name]->description;
-            if ('array' == $model->type) {
-                $params_typehint[$name]->items = $params_docblock[$name]->items;
+            $name = $parameter->getName();
+            $model = new ParaModel();
+            $model->name = $name;
+            $model->type = $reflection_type->getName();
+            if ('array' ==  $model->type){
+                $model->items = new ParaModel();
             }
+            if (!in_array($model->type, ['int', 'bool', 'float', 'string', 'array']) && !method_exists($model->type, 'symfonyApiStoreSubmittedData')){
+                // Don't use it
+                continue;
+            }
+            $model->location = 'query';
+            if (false !== strpos($route->getPath(), '{'.$name.'}')){
+                $model->location = 'path';
+            } else if (method_exists($reflection_type->getName(), 'symfonyApiStoreSubmittedData')){
+                $model->location = 'body';
+            }
+            
+            $model->required = !$parameter->isOptional();
+            $model->has_default = $parameter->isDefaultValueAvailable();
+            $model->default = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : false;
+            $model->is_nullable = $reflection_type->allowsNull();
+            
+            if ($docblock){
+                $model->description = $docblock->getSummary();
+                foreach($docblock->getTags() as $tag){
+                    if ('param' == $tag->getName() && $name == $tag->getVariableName()){
+                        if ($tag->getDescription()->getBodyTemplate()){
+                            // If variable description available, use it
+                            $model->description = $tag->getDescription()->getBodyTemplate();
+                        }
+                        $tagType = $tag->getType();
+                        if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
+                            $model->type = 'array';
+                            $model->items = new ParaModel();
+                            $valueType = $tagType->getValueType();
+                            if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
+                                $model->items->type = $valueType->getFqsen()->__toString();
+                            } else {
+                                $model->items->type = $valueType->__toString();
+                            }
+                        } else if (null === $model->type) {
+                            $model->type = $tagType->__toString();
+                        }
+                    }
+                }
+            }
+
+            $models[$name] = $model;
         }
-        return $params_typehint;
+        return $models;
     }
 
     /**
@@ -327,42 +426,101 @@ class DocBuilder
      * @return ParamModel[] Merged Models
      */
     public function getClassPropertyModels($classname){
-        $properties_typehint =  $this->TypeHintService->getClassPropertyModels($classname);
-        $properties_docblock =  $this->DocBlockService->getClassPropertyModels($classname);
-        foreach ($properties_typehint as $name => $model){
-            
-            if (!isset($properties_docblock[$name])){
+        
+        $reflection = new \ReflectionClass($classname);
+        $instance = new $classname();
+        $models = [];
+        foreach ($reflection->getProperties() as $property){
+            if (!$property->isPublic()){
                 continue;
             }
-            if ($properties_docblock[$name]->description){
-                $properties_typehint[$name]->description = $properties_docblock[$name]->description;
+            $model = new ParaModel();
+            $name = $property->getName();
+            $reflection_named_type = $property->getType();
+            $model->name = $name;
+            $model->location = $classname;
+            $model->type = $reflection_named_type ? $reflection_named_type->getName() : null;
+            $model->required = !$property->isInitialized($instance);
+            // ReflectionProperty::hasDefaultValue requires PHP 8
+            $model->has_default = $property->isInitialized($instance); 
+            //ReflectionProperty::getDefaultValue requires PHP 8
+            $model->default = $property->isInitialized($instance) ? $property->getValue($instance) : false; 
+            $model->is_nullable = $reflection_named_type ? $reflection_named_type->allowsNull() : false;
+            $docComment = $property->getDocComment();
+            if ($docComment){
+                // read doccomment
+                $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+                $docblock = $factory->create($docComment);
+                if ($docblock){
+                    $model->description = $docblock->getSummary();
+                    foreach($docblock->getTags() as $tag){
+                        if ('var' == $tag->getName()){
+                            if ($tag->getDescription()->getBodyTemplate()){
+                                // If variable description available, use it
+                                $model->description = $tag->getDescription()->getBodyTemplate();
+                            }
+                            $tagType = $tag->getType();
+                            if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
+                                $model->type = 'array';
+                                $model->items = new ParaModel();
+                                $valueType = $tagType->getValueType();
+                                if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
+                                    $model->items->type = $valueType->getFqsen()->__toString();
+                                } else {
+                                    $model->items->type = $valueType->__toString();
+                                }
+                            } else if (null === $model->type) {
+                                $model->type = $tagType->__toString();
+                            }
+                        }
+                    }
+                }
             }
-            if (null === $model->type) {
-                // typehint model wird erst ab PHP8 verfügbar sein
-                $model->type = $properties_docblock[$name]->type;
-            }
-            if ('array' == $model->type && is_object($properties_docblock[$name]->items)) {
-                // Wenn nur typehint und kein docblock, dann kann items auch mal null sein
-                $model->items = $properties_docblock[$name]->items;
-            }
-        }
-        return $properties_typehint;
+            $models[$name] = $model;
+        }    
+        return $models;
     }
 
     public function getReturnModel($route)
     {
-        $return_docblock = $this->DocBlockService->getMethodReturnModel($route);
-        $return_typehint = $this->TypeHintService->getMethodReturnModel($route);
-        if ($return_docblock){
-            $return_typehint->description = $return_docblock->description;
-            if (null !== $return_docblock->type){
-                $return_typehint->type = $return_docblock->type;
-            }
-            if ('array' == $return_typehint->type){
-                $return_typehint->items = $return_docblock->items;
+        $reflection = $this->RouteService->getMethodReflection($route);
+        if (null === $reflection){
+            return null;
+        }
+        $returnType = $reflection->getReturnType();
+        $model = new ParaModel();
+        $model->type = null === $returnType ? 'string' : $reflection->getReturnType()->getName();
+        if ('array' == $model->type){
+            $model->items = new ParaModel();
+        }
+        $docComment = $reflection->getDocComment();
+        $docblock = null;
+        if ($docComment){
+            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
+            $docblock = $factory->create($docComment);
+        }
+        if ($docblock){
+            foreach($docblock->getTags() as $tag){
+                if ('return' == $tag->getName()){
+                    $model->description = $tag->getDescription()->getBodyTemplate();
+                    $tagType = $tag->getType();
+                    if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
+                        $model->type = 'array';
+                        $model->items = new ParaModel();
+                        $valueType = $tagType->getValueType();
+                        if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
+                            $model->items->type = $valueType->getValueType()->getFqsen()->getName();
+                        } else {
+                            $model->items->type = $valueType->__toString();
+                        }
+                    } else {
+                        $model->type = $tagType->__toString();
+                    }
+                }
             }
         }
-        return $return_typehint;
+        
+        return $model;
     }
 
     

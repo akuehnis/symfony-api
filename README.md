@@ -84,7 +84,7 @@ akuehnis_symfony_api:
 
 Clear the cache after making any changes.
 
-### Add an URL to the Openapi Documentation
+### Typehinting and Php Docblock define the Openapi Models
 
 Symfony-API will only add routes to the documentation where an annotation of
 Akuehnis\SymfonyApi\AnnotationsSymfonyApi is present.
@@ -110,138 +110,35 @@ class DefaultController
      * Further lines will be the endpoint description.
      *
      * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
-     * @Route("/hello/{name}", name="app_hello", methods={"GET"})
-     * 
-     * @param string $name This is the description for the parameter 'name'
-     * @param string $number This is the description of the parameter 'number'
-     * @return This is description of the return value
+     * @Route("/hello/{$one}", name="app_hello", methods={"GET"})
+     * @param string $one Path parameter
+     * @param string $two Query parameter, required, not null
+     * @param int $three Query parameter, required, nullable
+     * @param bool $four Query parameter, not required, not null
+     * @param float $five Query parameter, nor required, nullable
+     * @return \App\Schemas\OutputModel The output model
      */
-    public function hello(string $name, int $number = 25): MyOutputModel
-    {
+    public function hello(
+        string $one
+        string $two,
+        ?int $three,
+        bool $four = false,
+        ?float $five = null
+    ){
         $model = new MyOutputModel();
-        $model->name = $name;
-        $model->number = $number;
+        // ... more code
         return $model;
     }
 
-    /**
-     * @Route("/notindoku/{name}", name="app_notindoku", methods={"GET"})
-     */
-    public function notindoku(string $name, int $number = 25): MyOutputModel
-    {
-        $model = new MyOutputModel();
-        $model->name = $name;
-        $model->number = $number;
-        return $model;
-    }
+    // ... probably more code
 
-}
-```
-
-## Query parameter
-
-If a controller function parameter is not defined in the path and is of type string, float, int or bool,
-it will be validated and injected by SymfonyApi automatically.
-
-```
-/**
-  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
-  * @Route("/testhello/{group}", name="app_testhello", methods={"GET"})
-*/
-public function testhello(string $group, string $search): Response
-{
-    /* 
-       Example:
-
-       GET /testhello/customers?search=Peter
-
-       $group will contain string 'customers'
-       $search will contain string 'Peter' 
-    */
-}
-```
-
-
-### Query parameter with default value
-
-If a query parameter shall be optional, set a default value.
-
-```
-/**
-  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
-  * @Route("/testfloatdefault", name="app_testfloatdefault", methods={"GET"})
-*/
-public function testfloat(float $number = 22.45): Response
-{
-    /* 
-       if $number is not passed a query parameter it will be 22.45. 
-    */
-}
-```
-
-### Nullable query parameter
-Allow a parameter to be NULL by setting default value to NULL.
-
-```
-/**
-  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
-  * @Route("/teststringnull", name="app_teststringnull", methods={"GET"})
-*/
-public function teststringnull(?string $myname = NULL): Response
-{
-    /* 
-        $myname can be string or null.
-    */
-}
-```
-
-### Required query parameter
-
-If a parameter is required, then do not preset neither a default value nor NULL.
-
-```
-/**
-  * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
-  * @Route("/testrequired", name="app_testrequired", methods={"GET"})
-*/
-public function testrequired(int $quantity): Response
-{
-    /* 
-       $quantity must be set. If it is not present in the url, then a 400 error will be returned.
-    */
-}
-```
-
-
-### Boolean query parameter
-
-Symfony-Api does treat the following values as 'false':
-    * false
-    * 0
-
-Symfony-Api does treat the following values as 'true':
-    * true
-    * 1
-
-```
-/**
-  * @Route("/testbool", name="app_testbool", methods={"GET"})
-*/
-public function testbool(bool $activated = true): Response
-{
-    /* 
-       /testbool?activated=true:  true
-       /testbool?activated=1:     true
-       /testbool?activated=false: false
-       /testbool?activated=0:     false
-    */
 }
 ```
 
 
 ## Body Model
 
-The model MUST extend ApiBaseModel
+The model MUST use ApiBaseTrait
 
 ```
 <?php
@@ -252,23 +149,22 @@ namespace App\Schemas;
 use Symfony\Component\Validator\Constraints as Assert;
 use DateTimeInterface;
 
-use Akuehnis\SymfonyApi\Models\ApiBaseModel;
+use Akuehnis\SymfonyApi\Models\ApiBaseTrait;
 
-class MyInputModel extends ApiBaseModel {
+class MyInputModel  {
 
-    public function __construct(){
-        $this->updated = new \DateTime();
-    }
+    use ApiBaseTrait;
+
 
     /**
-     * @var string $name This is the name
+     * @var string $name Required property, not null
      */
     public string $name;
 
     /**
-     * This will be the description a no @var-Tag is present
+     * @var int $prio not required property with default value, nullable
      */
-    public int $counter;
+    public ?int $counter = 33;
 
 }
 ```
@@ -292,13 +188,12 @@ class DefaultController
     /**
      * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/testpatch/{id}", name="app_testpatch", methods={"PATCH"})
+     * @Param MyInputModel $model 
      */
-    public function testpatch(int $id, MyInputModel $model): Response
+    public function testpatch(int $id, MyInputModel $model)
     {
-        // $model will be of type MyInputModel
-        // If you are interested just in the submitted data, use method fetchSubmittedData()
 
-        return new JsonResponse($model->fetchSubmittedData());
+        //... do something with the model
 
     }
 }
@@ -307,8 +202,10 @@ class DefaultController
 
 ## Return Model
 
-If the return class extends Akuehnis\SymfonyApi\Models\ApiBaseModel, this model will 
-be documented in Openapi.
+If the return class must be documented in the PHPDocBlock, not as a return typehint. 
+The reason for this is that the returned type may be different.
+
+If the return Model is a class extending the BaseModel, it will automatically be serialized to Json.
 
 
 ```
@@ -317,14 +214,13 @@ be documented in Openapi.
 
 namespace App\Schemas;
 
-use Akuehnis\SymfonyApi\Models\ApiBaseModel;
+use Akuehnis\SymfonyApi\Models\ApiBaseTrait;
 
-class MyOutputModel extends ApiBaseModel {
-
-    public function __construct(){
-        $this->updated = new \DateTime();
-    }
-
+class MyOutputModel {
+    use ApiBaseTrait;
+    /**
+     * @var string $name The name property
+     */
     public string $name;
 
 }
@@ -346,8 +242,9 @@ class DefaultController
     /**
      * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/testoutput, name="app_testoutput", methods={"GET"})
+     * @Return MyOutputModel Define the output model here
      */
-    public function testoutput(int $id, MyInputModel $model): MyOutputModel
+    public function testoutput(int $id, MyInputModel $model)
     {
         $out = new MyOutputModel();
         $out->name= "Peter";
@@ -357,23 +254,4 @@ class DefaultController
 }
 
 ```
-
-
-## Type declarations (Type-Hinting or PHPDocBlock)
-
-By default, Symfony-API uses Type hints to find out what type of variable is required. With one exception:
-
-If the type is an array, then PHP does only allow to typehint 'array' without further description what the array
-contains. In these cases, Symfony-API parses the PHPDoc. This allows to specify array contents.
-
-```
-@return MyOutputModel[] Array of output models
-
-or 
-
-@return array<MyOutputModel> Array of output models
-```
-
-In all other cases Symfony-API uses type hint information for validation. However, if available, PHPDoc type information
-is used for documentation.
 

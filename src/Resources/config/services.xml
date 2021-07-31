@@ -39,8 +39,6 @@
 
         <service id="Akuehnis\SymfonyApi\Services\DocBuilder">
             <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBlockService" />
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\TypeHintService" />
             <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
             <argument key="$config_documentation">%akuehnis_symfony_api.documentation%</argument>
         </service>

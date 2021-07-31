@@ -31,21 +31,7 @@ class TypeHintService {
         return $tags;
     }
     
-    public function getMethodReturnModel($route)
-    {
-        $reflection = $this->RouteService->getMethodReflection($route);
-        if (null === $reflection){
-            return null;
-        }
-        $returnType = $reflection->getReturnType();
 
-        $param = new ParaModel();
-        $param->type = null === $returnType ? 'string' : $reflection->getReturnType()->getName();
-        if ('array' == $param->type){
-            $param->items = new ParaModel();
-        }
-        return $param;
-    }
 
     /**
      * Return Paramodels for route parameters 
@@ -91,38 +77,7 @@ class TypeHintService {
         return $list;
     }
 
-    /**
-     * Return Paramodel for class properties
-     * 
-     * @param string $classname 
-     * @return ParaModel[] array of Paramodels
-     * 
-     */
-    public function getClassPropertyModels($classname)
-    {
-        $class_vars = get_class_vars($classname);
-        $reflection = new \ReflectionClass($classname);
-        $list = [];
-        foreach ($reflection->getProperties() as $property){
-            //ReflectionProperty::hasDefaultValue() erst ab PHP 8
-            $name = $property->getName();
-            $list[$name] = new ParaModel();
-            $list[$name]->location = $classname;
-            $list[$name]->name = $name;
-            $list[$name]->type = $property->hasType() ? $property->getType()->getName() : null;
-            if ('array' ==  $list[$name]->type){
-                $list[$name]->items = new ParaModel();
-            }
-            $list[$name]->required = isset($class_vars[$name]);
-            $list[$name]->has_default = isset($class_vars[$name]);
-            $list[$name]->is_nullable = true; // todo - maybe with PHP 8 only?
-            if (isset($class_vars[$name])){
-                $list[$name]->default = $class_vars[$name];
-            }
-        }
 
-        return $list;
-    }
 
     public function getClasses($route){
         $parameters = $this->getRouteParameterModels($route);
