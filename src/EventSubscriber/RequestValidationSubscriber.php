@@ -6,15 +6,20 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validation;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Akuehnis\SymfonyApi\Services\DocBuilder;
+use Akuehnis\SymfonyApi\Services\RouteService;
 
 class RequestValidationSubscriber implements EventSubscriberInterface
 {
     protected $DocBuilder;
+    protected $RouteService;
 
-    public function __construct(DocBuilder $DocBuilder)
+    public function __construct(DocBuilder $DocBuilder, RouteService $RouteService, ValidatorInterface $Validator)
     {
         $this->DocBuilder = $DocBuilder;
+        $this->RouteService = $RouteService;
+        $this->Validator = $Validator;
     }
 
     public static function getSubscribedEvents()
@@ -85,19 +90,46 @@ class RequestValidationSubscriber implements EventSubscriberInterface
      */
     public function validateQuery($request, $route)
     {
-        $parameter_definitions = $this->DocBuilder->getRouteParameterModels($route);
-        $input = [];
-        $constraints = [];
-        foreach ($parameter_definitions as $definition){
-            if ('query' != $definition->location){
+        $errors = [];
+        $reflection = $this->RouteService->getMethodReflection($route);
+        foreach ($reflection->getParameters() as $parameter){
+            $name = $parameter->getName();
+            $reflection_type = $parameter->getType();
+            if (!$reflection_type) {
                 continue;
             }
-            $name = $definition->name;
-            $input[$name] = $request->get($definition->name);
-            $constraints[$name] = $this->getConstraints($definition);
+            $type = $reflection_type->getName();
+            $converter = null;
+            $defaultValue = null;
+            if ($parameter->isDefaultValueAvailable()){
+                $defaultValue = $parameter->getDefaultValue();
+            }
+            if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
+                $converter = $defaultValue;
+
+            } elseif (in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
+                $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                $converter = new $className(['defaultValue' => $parameter->getDefaultValue()]);
+            } else {
+                continue;
+            }
+            $converter->value = $request->get($name);
+            $violations = $this->Validator->validate($converter);
+            if (0 < count($violations)) {
+                foreach ($violations as $violation){
+                    // property-Path enthält [property_name]
+                    $name =  trim($violation->getPropertyPath(), '[]');
+                    $constraint = $violation->getConstraint();
+                    $type = get_class($constraint);
+                    $errors[] = [
+                        'loc' => array_merge(['query'], [$name]),
+                        'msg' => $violation->getMessage(),
+                        'type' => $type,
+                    ];
+                }
+            }
         }
-        $errors = $this->validate($input, $constraints, ['query']);
-        
+
         return $errors;
     }
 
