@@ -32,24 +32,45 @@ class BodyResolver implements ArgumentValueResolverInterface
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $classname = $argument->getType();
-        $obj = new $classname();
-        $property_models = $this->DocBuilder->getClassPropertyModels($classname);
+        $obj = $this->resolveClass($classname, $request);
+
+        yield $obj;
+    }
+
+    public function resolveClass($classname, $request){
+        $obj = new $classname;
         $data = json_decode($request->getContent(), true);
+        $reflection = new \ReflectionClass($classname);
         $submitted_data = [];
-        foreach ($data as $key => $val){
-            if (isset($property_models[$key])) {
-                $type = $property_models[$key]->type;
-                if ('DateTime' == $type){
-                    $val = new \DateTime($val);
-                } else {
-                    settype($val, $type);
-                }
+        foreach ($reflection->getProperties() as $property){
+            if (!$property->isPublic()){
+                continue;
             }
-            $obj->{$key} = $val;
-            $submitted_data[$key] = $val;
+            $reflection_type = $property->getType();
+            $type = $reflection_type->getName();
+            $name = $property->getName();
+            if (!array_key_exists($name, $data)){
+                continue;
+            }
+            if (!$property->hasDefaultValue() || !is_object($property->getDefaultValue())){
+                $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                if ($property->hasDefaultValue()){
+                    $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
+                } else {
+                    $converter = new $className([]);
+                }
+            } else {
+                $converter = $property->getDefaultValue();
+            }
+            if (isset($data[$name])){
+                $converter->value = $data[$name];
+                $obj->{$name} = $converter->denormalize();
+                $submitted_data[$name] = $obj->{$name};
+            }
         }
         $obj->storeSubmittedData($submitted_data);
 
-        yield $obj;
+        return $obj;
+
     }
 }
