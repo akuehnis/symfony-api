@@ -42,42 +42,15 @@ class RequestValidationSubscriber implements EventSubscriberInterface
             // Route is not in the observed range of SymfonyApi
             return;
         }
-        $errors_path = $this->validatePath($request, $route);
         $errors_query = $this->validateQuery($request, $route);
         $errors_body = $this->validateBody($request, $route);
-        $errors = array_merge($errors_path, $errors_query, $errors_body);
+        $errors = array_merge($errors_query, $errors_body);
         if (0 < count($errors)){
             $event->setResponse(new JsonResponse([
                 'detail' => 'Request validation failed',
                 'errors' => $errors,
             ], 400));
         }
-    }
-
-    /**
-     * Validate path and query parameters
-     * 
-     * @param Request $request The symfony request object
-     * @param Route $route The symfony route object
-     * @return array errors
-     * 
-     */
-    public function validatePath($request, $route)
-    {
-        $parameter_definitions = $this->DocBuilder->getRouteParameterModels($route);
-        $input = [];
-        $constraints = [];
-        foreach ($parameter_definitions as $definition){
-            if ('path' != $definition->location){
-                continue;
-            }
-            $name = $definition->name;
-            $input[$name] = $request->get($definition->name);
-            $constraints[$name] = $this->getConstraints($definition);
-        }
-        $errors = $this->validate($input, $constraints, ['path']);
-        
-        return $errors;
     }
 
     /**
@@ -106,14 +79,21 @@ class RequestValidationSubscriber implements EventSubscriberInterface
             }
             if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
                 $converter = $defaultValue;
-
             } elseif (in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
                 $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
-                $converter = new $className(['defaultValue' => $parameter->getDefaultValue()]);
+                if ($parameter->isDefaultValueAvailable()){
+                    $converter = new $className(['defaultValue' => $parameter->getDefaultValue()]);
+                } else {
+                    $converter = new $className([]);
+                }
             } else {
                 continue;
             }
             $converter->value = $request->get($name);
+            $location = ['query'];
+            if (false !== strpos($route->getPath(), '{'.$name.'}')){
+                $location = ['path']; 
+            } 
             $violations = $this->Validator->validate($converter);
             if (0 < count($violations)) {
                 foreach ($violations as $violation){
@@ -122,7 +102,7 @@ class RequestValidationSubscriber implements EventSubscriberInterface
                     $constraint = $violation->getConstraint();
                     $type = get_class($constraint);
                     $errors[] = [
-                        'loc' => array_merge(['query'], [$name]),
+                        'loc' => array_merge($location, [$name]),
                         'msg' => $violation->getMessage(),
                         'type' => $type,
                     ];

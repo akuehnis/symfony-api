@@ -55,9 +55,13 @@ class QueryResolver implements ArgumentValueResolverInterface
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
-        if (!is_object($argument->getDefaultValue())){
+        if (!$argument->hasDefaultValue() || !is_object($argument->getDefaultValue())){
             $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
-            $converter = new $className(['defaultValue' => $argument->getDefaultValue()]);
+            if ($argument->hasDefaultValue()){
+                $converter = new $className(['defaultValue' => $argument->getDefaultValue()]);
+            } else {
+                $converter = new $className([]);
+            }
         } else {
             $converter = $argument->getDefaultValue();
         }

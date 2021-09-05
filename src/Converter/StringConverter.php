@@ -1,10 +1,14 @@
 <?php
 namespace Akuehnis\SymfonyApi\Converter;
 
+use Symfony\Component\Validator\Constraints as Assert;
 
 class StringConverter extends ApiConverter
 {
 
+    /**
+     * @Assert\Type("string")
+     */
     public $value;
 
     public function denormalize(){
