@@ -14,14 +14,15 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 use Akuehnis\SymfonyApi\Services\DocBuilder;
-
+use Akuehnis\SymfonyApi\Types\BaseField;
+use Akuehnis\SymfonyApi\Types\BaseType;
 
 class QueryResolver implements ArgumentValueResolverInterface
 {
     private $security;
     private $DocBuilder;
 
-    private $base_types =  ['string', 'int', 'float', 'bool'];
+    private $base_types =  ['string', 'int', 'float', 'bool', 'array'];
 
     public function __construct(DocBuilder $DocBuilder)
     {
@@ -34,11 +35,18 @@ class QueryResolver implements ArgumentValueResolverInterface
     public function supports(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
-        if (!in_array($type, $this->base_types)) {
+        if (in_array($type, $this->base_types)) {
+            return true;
+        }
+        if (!$argument->hasDefaultValue()){
             return false;
         }
+        $defaultValue = $argument->getDefaultValue();
+        if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
+            return true;
+        }
 
-        return true;
+        return false;
     }
 
     /**
@@ -47,19 +55,16 @@ class QueryResolver implements ArgumentValueResolverInterface
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $type = $argument->getType();
-        $routeName = $request->attributes->get('_route');
-        if (!$routeName){
-            return;
+        if (!is_object($argument->getDefaultValue())){
+            $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+            $converter = new $className(['defaultValue' => $argument->getDefaultValue()]);
+        } else {
+            $converter = $argument->getDefaultValue();
         }
-        $route = $this->DocBuilder->getRouteByName($routeName);
-        $parameter_models = $this->DocBuilder->getRouteParameterModels($route);
-        if (isset($parameter_models[$argument->getName()])){
-            $val = $request->query->get($argument->getName());
-            if (null === $val && $parameter_models[$argument->getName()]->has_default){
-                yield $parameter_models[$argument->getName()]->default;
-            } else {
-                yield $val;
-            }
-        }
+        $value = $request->query->get($argument->getName());
+        if (null !== $value){
+            $converter->value = $value;
+        } 
+        yield $converter->denormalize();
     }
 }

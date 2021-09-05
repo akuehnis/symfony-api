@@ -481,6 +481,10 @@ class DocBuilder
         return $models;
     }
 
+    /**
+     * Ab PHP 8 sind Union Return Types möglich, z.B. 
+     * A|null, ?A oder A|B|null
+     */
     public function getReturnModel($route)
     {
         $reflection = $this->RouteService->getMethodReflection($route);

@@ -19,7 +19,7 @@
         
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
             <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
-            <tag name="controller.argument_value_resolver" priority="50"/>
+            <tag name="controller.argument_value_resolver" priority="200"/>
         </service>
 
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\BodyResolver">

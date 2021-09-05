@@ -1,13 +1,13 @@
 {
     "name": "akuehnis/symfony-api",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "type": "library",
     "description": "Helper to quickly build APIs with Symfony",
     "keywords": ["php", "api", "symfony", "documentation", "doc", "rest"],
     "homepage": "https://azular.com",
     "license": "MIT",
     "require": {
-        "php": ">=7.4.0",
+        "php": ">=8.1",
         "symfony/validator": "*",
         "symfony/property-info": "*",
         "phpdocumentor/reflection-docblock": "*"
