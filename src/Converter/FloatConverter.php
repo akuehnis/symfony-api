@@ -12,6 +12,10 @@ class FloatConverter extends ApiConverter
      */
     public $value;
 
+    public string $type = 'number';
+
+    public ?string $format = 'float';
+
     public function denormalize(){
         return (float)$this->value;
     }

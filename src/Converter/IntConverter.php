@@ -16,6 +16,9 @@ class IntConverter extends ApiConverter
      */
     public $value;
 
+
+    public string $type = 'integer';
+
     public function denormalize(){
         return (int)$this->value;
     }

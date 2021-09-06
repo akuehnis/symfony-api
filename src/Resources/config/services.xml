@@ -6,14 +6,6 @@
     <services>
         <defaults autowire="true"/>
         
-        <service id="Akuehnis\SymfonyApi\Services\DocBlockService">
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
-        </service>
-
-        <service id="Akuehnis\SymfonyApi\Services\TypeHintService">
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
-        </service>
-
         <service id="Akuehnis\SymfonyApi\Services\RouteService">
             <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
         </service>

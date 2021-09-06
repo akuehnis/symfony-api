@@ -12,6 +12,8 @@ class StringConverter extends ApiConverter
      */
     public $value;
 
+    public string $type = 'string';
+
     public function denormalize(){
         return (string)$this->value;
     }

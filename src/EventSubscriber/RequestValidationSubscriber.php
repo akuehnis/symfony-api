@@ -38,7 +38,10 @@ class RequestValidationSubscriber implements EventSubscriberInterface
         if (!$routeName){
             return;
         }
-        $route = $this->DocBuilder->getRouteByName($routeName);
+        if (!$this->RouteService->isApiRoute($request)){
+            return;
+        }
+        $route = $this->RouteService->getRouteByName($routeName);
         if (!$route){
             // Route is not in the observed range of SymfonyApi
             return;
@@ -97,10 +100,6 @@ class RequestValidationSubscriber implements EventSubscriberInterface
                 $defaultValue = $parameter->getDefaultValue();
             }
             $converter_annotations = array_filter($annotations, function($item) use ($name) {
-                return is_subclass_of($item, 'Akuehnis\SymfonyApi\Converter\ApiConverter')
-                    && $item->property_name == $name;
-            });
-            $converter = array_shift($converter_annotations);$converter_annotations = array_filter($annotations, function($item) use ($name) {
                 return is_subclass_of($item, 'Akuehnis\SymfonyApi\Converter\ApiConverter')
                     && $item->property_name == $name;
             });

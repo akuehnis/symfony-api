@@ -12,6 +12,8 @@ class ArrayConverter extends ApiConverter
      */
     public $value;
 
+    public string $type = 'array';
+
     public function denormalize(){
         return (array)$this->value;
     }

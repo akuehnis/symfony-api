@@ -7,6 +7,8 @@ class BoolConverter extends ApiConverter
 
     public $value;
 
+    public string $type = 'boolean';
+
     public function denormalize(){
         return (bool)$this->value;
     }

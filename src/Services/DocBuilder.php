@@ -71,9 +71,11 @@ class DocBuilder
     }
 
     public function getPaths($routes){
+        $annotationReader = new AnnotationReader();
         $paths = [];
         foreach ($routes as $route) {
             $reflection = $this->RouteService->getMethodReflection($route);
+            $annotations = $annotationReader->getMethodAnnotations($reflection);
             $docComment = $reflection  ? $reflection->getDocComment() : null;
             $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
             $docblock = $factory->create($docComment ? $docComment : '/** */');
@@ -90,120 +92,58 @@ class DocBuilder
             });
 
             $parameters = [];
-            foreach ($this->getRouteParameterModels($route) as $param_name => $parameter_model) {
-                if ('body' == $parameter_model->location){
+            foreach($reflection->getParameters() as $param){
+                $type = $param->getType();
+                $name = $param->getName();
+                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                     // will be used below, see request_body
                     continue;
                 }
+                $location = ['query'];
+                if (false !== strpos($route->getPath(), '{'.$name.'}')){
+                    $location = ['path']; 
+                } 
+                $converter = $this->RouteService->getParameterConverter($route, $name);
+                if (!$converter){
+                    continue;
+                }
                 $parameter_def = [
-                    'name' => $param_name,
+                    'name' => $name,
                 ];
-                if ($parameter_model->description){
-                    $parameter_def['description'] = $parameter_model->description;
+                if ($converter->getTitle()){
+                    $parameter_def['description'] = $converter->getTitle();
                 }
-                if (null !== $parameter_model->location){
-                    $parameter_def['in'] = $parameter_model->location;
-                }
-                if (true === $parameter_model->required){
-                    $parameter_def['required'] = true;
-                }
-                
-                
-                if ($parameter_model->type){   
-                    list($type, $format) = $this->getTypeAndFormat($parameter_model->type);
-                    $parameter_def['schema'] = [
-                        'type' => $type
-                    ];
-                    if (null !== $format) {
-                        $parameter_def['schema']['format'] = $format;
-                    }
-                    if ($parameter_model->has_default){
-                        $parameter_def['schema']['default'] = $parameter_model->default;
-                    }
-                    if ($parameter_model->is_nullable){
-                        $parameter_def['schema']['nullable'] = true;
-                    }
+                $parameter_def['in'] = $location;
+                $parameter_def['schema'] = [
+                    'type' => $converter->getType(),
+                ];
+                if ($converter->getFormat()){
+                    $parameter_def['schema']['format'] = $converter->getFormat();
 
                 }
+            
                 $parameters[] = $parameter_def;
             }
             $responses = [];
 
             $return_model = $this->getReturnModel($route);
-            if (null !== $return_model){
-                if ('array' == $return_model->type){
-                    $responses['200'] = [
-                        'description'=> $return_model->description,
-                        'content' => [
-                            'application/json' => [
-                                'schema' => [
-                                    'type' => 'array',
-                                ]
-                            ]
-                        ]
-                    ];
-                    if (null === $return_model) {
-                        // nothing to add. shall we throw an exception?
-                    } else if (in_array($return_model->items->type, ['bool', 'float', 'string', 'int'])){
-                        list($type, $format) = $this->getTypeAndFormat($return_model->items->type);
-                        $responses['200']['content']['application/json']['schema']['items']['type'] = $type;
-                        if ($format){
-                            $responses['200']['content']['application/json']['schema']['items']['format'] = $format;
-                        }
-                    } else {
-                        $reflect = new \ReflectionClass($return_model->items->type);
-                        $responses['200'] = [
-                            'description'=> $return_model->description,
-                            'content' => [
-                                'application/json' => [
+            if ($return_model){
+                $reflect = new \ReflectionClass($return_model);
+                $responses['200'] = [
+                    'description'=> 'return model',
+                    'content' => [
+                        'application/json' => [
+                            'schema' => [
+                                'type' => 'array',
+                                'items' => [
                                     'schema' => [
-                                        'type' => 'array',
-                                        'items' => [
-                                            'schema' => [
-                                                '$ref' => '#/components/schemas/' . $reflect->getShortName(),
-                                                ]
+                                        '$ref' => '#/components/schemas/' . $reflect->getShortName(),
                                         ]
-                                    ]
-                                ]
-                            ]
-                        ];
-                    }
-                } else if (method_exists($return_model->type, 'symfonyApiStoreSubmittedData')){
-                    $reflect = new \ReflectionClass($return_model->type);
-                    $responses['200'] = [
-                        'description'=> $return_model->description,
-                        'content' => [
-                            'application/json' => [
-                                'schema' => [
-                                    '$ref' => '#/components/schemas/' . $reflect->getShortName(),
                                 ]
                             ]
                         ]
-                    ];
-                } else if ($return_model->type == 'Symfony\Component\HttpFoundation\JsonResponse'){
-                    $reflect = new \ReflectionClass($return_model->type);
-                    $responses['200'] = [
-                        'description'=> $return_model->description,
-                        'content' => [
-                            'application/json' => [
-                                'schema' => [
-                                    'type' => 'object',
-                                ]
-                            ]
-                        ]
-                    ];
-                } else {
-                    $responses['200'] = [
-                        'description'=> $return_model->description,
-                        'content' => [
-                            'text/html' => [
-                                'schema' => [
-                                    'type' => 'string'
-                                ]
-                            ]
-                        ],
-                    ];
-                }
+                    ]
+                ];
             }
             $responses['400'] = [
                 'description'=> 'Validation errors',
@@ -216,15 +156,20 @@ class DocBuilder
                 ],
             ];
 
-            $body_model = null;
             $request_body = null;
-            foreach ($this->getRouteParameterModels($route) as $param_name => $param_model) {
-                if ('body' == $param_model->location){
-                    $body_model = $param_model;
+            $body_type = null;
+            $reflection = $this->RouteService->getMethodReflection($route);
+            foreach ($reflection->getParameters() as $param) {
+                $reflection_type = $param->getType();
+                $type = $reflection_type->getName();
+                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                    $body_type = $type;
+                    break;
                 }
+
             }
-            if ($body_model){
-                $reflect = new \ReflectionClass($body_model->type);
+            if ($body_type){
+                $reflect = new \ReflectionClass($body_type);
                 $request_body = [
                     'content' => [
                         'application/json' => [
@@ -304,10 +249,8 @@ class DocBuilder
         foreach ($routes as $route){
             $classes = $this->getClasses($route);
             foreach($classes as $class_name){
-                if (method_exists($class_name, 'symfonyApiStoreSubmittedData')){
-                    $reflect = new \ReflectionClass($class_name);
-                    $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($class_name);
-                }
+                $reflect = new \ReflectionClass($class_name);
+                $definitions[$reflect->getShortName()] = $this->getDefinitionOfClass($class_name);
             }         
         }
         $definitions['Response400'] = $this->getDefinitionOfClass('Akuehnis\SymfonyApi\Models\Response400');
@@ -315,108 +258,39 @@ class DocBuilder
         return $definitions;
     }
 
-    public function getClasses($route){
-        $parameters = $this->getRouteParameterModels($route);
-        $returnModel = $this->getReturnModel($route);
-        $models = [];
-        foreach ($parameters as $name => $param){
-            $type = $param->type;
-            if ('array' == $type){
-                $type = $param->items->type;
-            }
-            if (!in_array($type, ['bool', 'int', 'string', 'float'])){
-                $models[$name] = $type;
-            }
-        }
-        if ($returnModel){
-            $type = $returnModel->type;
-            if ('array' == $type && $returnModel->items){
-                $type = $returnModel->items->type;
-            } 
-            if (!in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
-                $models['responseModel'] = $type;
-            }
-
-        }
-
-        return $models;
-    }
-
     /**
-     * Collects models from Typehinting and Docblock and merges
+     * returns all model classes for a route
      * 
-     * @return ParamModel[] Merged Models
+     * Searches
+     * - Body Class
+     * - Return model class (annotation)
      */
-    public function getRouteParameterModels($route){
+    public function getClasses($route){
+        $classes = [];
         $reflection = $this->RouteService->getMethodReflection($route);
-        if (null === $reflection){
-            return [];
+        foreach ($reflection->getParameters() as $param){
+            $reflection_type = $param->getType();
+            $type = $reflection_type->getName();
+            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                $classes[] = $type;
+            }
         }
-        $docComment = $reflection->getDocComment();
-        $docblock = null;
-        if ($docComment){
-            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
-            $docblock = $factory->create($docComment);
-        }
-        $models = [];
-        foreach ($reflection->getParameters() as $parameter){
 
-            $reflection_type = $parameter->getType();
-            if (!$reflection_type) {
-                continue;
-            }
-            $name = $parameter->getName();
-            $model = new ParaModel();
-            $model->name = $name;
-            $model->type = $reflection_type->getName();
-            if ('array' ==  $model->type){
-                $model->items = new ParaModel();
-            }
-            if (!in_array($model->type, ['int', 'bool', 'float', 'string', 'array']) && !method_exists($model->type, 'symfonyApiStoreSubmittedData')){
-                // Don't use it
-                continue;
-            }
-            $model->location = 'query';
-            if (false !== strpos($route->getPath(), '{'.$name.'}')){
-                $model->location = 'path';
-            } else if (method_exists($reflection_type->getName(), 'symfonyApiStoreSubmittedData')){
-                $model->location = 'body';
-            }
-            
-            $model->required = !$parameter->isOptional();
-            $model->has_default = $parameter->isDefaultValueAvailable();
-            $model->default = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : false;
-            $model->is_nullable = $reflection_type->allowsNull();
-            
-            if ($docblock){
-                $model->description = $docblock->getSummary();
-                foreach($docblock->getTags() as $tag){
-                    if ('param' == $tag->getName() && $name == $tag->getVariableName()){
-                        if ($tag->getDescription()->getBodyTemplate()){
-                            // If variable description available, use it
-                            $model->description = $tag->getDescription()->getBodyTemplate();
-                        }
-                        $tagType = $tag->getType();
-                        if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
-                            $model->type = 'array';
-                            $model->items = new ParaModel();
-                            $valueType = $tagType->getValueType();
-                            if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
-                                $model->items->type = $valueType->getFqsen()->__toString();
-                            } else {
-                                $model->items->type = $valueType->__toString();
-                            }
-                        } else if (null === $model->type) {
-                            $model->type = $tagType->__toString();
-                        }
-                    }
+        $reflection = $this->RouteService->getMethodReflection($route);
+        if ($reflection){
+            $annotationReader = new AnnotationReader();
+            $annotations = $annotationReader->getMethodAnnotations($reflection);
+            foreach($annotations as $annotation){
+                if ('Akuehnis\SymfonyApi\Annotations\ResponseModel' == get_class($annotation)){
+                    $classes[] = $annotation->name;
                 }
             }
-
-            $models[$name] = $model;
         }
-        return $models;
+
+        return $classes;
     }
+
+    
 
     /**
      * Collects properties from Typehinting and Docblock and merges
@@ -487,44 +361,18 @@ class DocBuilder
      */
     public function getReturnModel($route)
     {
+        $annotationReader = new AnnotationReader();
         $reflection = $this->RouteService->getMethodReflection($route);
         if (null === $reflection){
             return null;
         }
-        $returnType = $reflection->getReturnType();
-        $model = new ParaModel();
-        $model->type = null === $returnType ? 'string' : $reflection->getReturnType()->getName();
-        if ('array' == $model->type){
-            $model->items = new ParaModel();
-        }
-        $docComment = $reflection->getDocComment();
-        $docblock = null;
-        if ($docComment){
-            $factory  = \phpDocumentor\Reflection\DocBlockFactory::createInstance();
-            $docblock = $factory->create($docComment);
-        }
-        if ($docblock){
-            foreach($docblock->getTags() as $tag){
-                if ('return' == $tag->getName()){
-                    $model->description = $tag->getDescription()->getBodyTemplate();
-                    $tagType = $tag->getType();
-                    if ('phpDocumentor\Reflection\Types\Array_' == get_class($tagType)){
-                        $model->type = 'array';
-                        $model->items = new ParaModel();
-                        $valueType = $tagType->getValueType();
-                        if ('phpDocumentor\Reflection\Types\Object_' == get_class($valueType)){
-                            $model->items->type = $valueType->getValueType()->getFqsen()->getName();
-                        } else {
-                            $model->items->type = $valueType->__toString();
-                        }
-                    } else {
-                        $model->type = $tagType->__toString();
-                    }
-                }
+        $annotations = $annotationReader->getMethodAnnotations($reflection);
+        foreach ($annotations as $annotation){
+            if (get_class($annotation) == 'Akuehnis\SymfonyApi\Annotations\ResponseModel'){
+                return $annotation->name;
             }
         }
-        
-        return $model;
+        return null;
     }
 
     
@@ -536,76 +384,67 @@ class DocBuilder
      */
     public function getDefinitionOfClass($classname) 
     {  
+        $annotationReader = new AnnotationReader();
         $def = [
             'type' => 'object',
             'properties' => [],
         ];
-        foreach ($this->getClassPropertyModels($classname) as $name=>$prop_model){
-            // do not touche original model used by request validator
-            list($type, $format) = $this->getTypeAndFormat($prop_model->type);
-            $openapi_prop = (object)[
-                'type' => $type,
-            ];
-            if ($format){
-                $openapi_prop->format = $format;
+        $reflection = new \ReflectionClass($classname);
+        foreach ($reflection->getProperties() as $property){
+            if (!$property->isPublic()){
+                continue;
             }
-            if ($prop_model->description){
-                $openapi_prop->description = $prop_model->description;
+            $reflection_type = $property->getType();
+            if (!$reflection_type) {
+                continue;
             }
-            if ($prop_model->is_nullable){
-                $openapi_prop->nullable = true;
-            }
-            if ($prop_model->has_default){
-                $openapi_prop->default = $prop_model->default;
-            }
-            if ('array' == $type){
-                if (is_object($prop_model->items) && null !== $prop_model->items->type){
-                    if (in_array($prop_model->items->type, ['bool', 'float', 'string', 'int'])){
-                        list($item_type, $item_format) = $this->getTypeAndFormat($prop_model->items->type);
-                        $openapi_prop->items = [];
-                        $openapi_prop->items['type'] = $item_type;
-                        if (null !== $item_format){
-                            $openapi_prop->items['format'] = $item_format;
+            $type = $reflection_type->getName();
+            $name = $property->getName();
+            $converter = null;
+            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                $obj->name = $this->getDefinitionOfClass($type);
+            } else {
+                $annotations = $annotationReader->getPropertyAnnotations($property);
+                foreach ($annotations as $annotation){
+                    if (is_object($annotation) && is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
+                        $converter = $annotation;
+                    }
+                }
+                if (!$converter){
+                    if (in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
+                        $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                        if ($property->hasDefaultValue()){
+                            $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
+                        } else {
+                            $converter = new $className([]);
                         }
                     } else {
-                        $reflect = new \ReflectionClass($prop_model->items->type);
-                        $openapi_prop->items = [
-                            '$ref' => '#/components/schemas/' . $reflect->getShortName(),
-                        ];
+                        throw new \Exception("No converter found for " . $name);
                     }
-                } else {
-                    $openapi_prop->items = (object)[]; // Any type
                 }
             }
-            $def['properties'][$name] = $openapi_prop;
+            if ($converter){
+                $openapi_prop = (object)[
+                    'type' => $converter->getType(),
+                ];
+                if ($converter->getFormat()){
+                    $openapi_prop->format = $converter->getFormat();
+                }
+                $def['properties'][$name] = $openapi_prop;
+                /*
+                 $reflect = new \ReflectionClass($prop_model->items->type);
+                 $openapi_prop->items = [
+                     '$ref' => '#/components/schemas/' . $reflect->getShortName(),
+                    ];
+                    
+                */
+            }
+
         }
 
         return $def;
     }
 
-    /**
-     * Convert PHP type to openapi type and format
-     * 
-     * @param string $type
-     * @return mixed 
-     */
-    public function getTypeAndFormat($type){
-        $type = $type;
-        $format = null;
-        if ('int' == $type){
-            $type = 'integer';
-        } else if ('float' == $type){
-            $type = 'number';
-            $format = 'float';
-        } else if ('bool' == $type){
-            $type = 'boolean';
-        } else if ('string' == $type){
-            $type = 'string';
-        } else if ('mixed' == $type){
-            $type = (object)[]; // Any Type
-        }
-
-        return [$type, $format];
-    }
+    
 
 }

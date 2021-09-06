@@ -14,12 +14,16 @@ class ApiConverter
     /**
      * Title of the value in Openapi
      */
-    public $title = '';
+    public string $title = '';
 
     /**
      * Description of the value in Openapi
      */
     public $description = '';
+
+    public string $type = '';
+
+    public ?string $format = null;
 
     /**
      * Property Name. Only for property converters which must be passed as method annotation (prior to PHP 8.1)
@@ -31,7 +35,9 @@ class ApiConverter
         if (isset($params['defaultValue'])){
             $this->normalize($params['defaultValue']);
         }
-        $this->title = isset($params['title']) ? (string) $params['title'] : get_class($this);
+        if (isset($params['title'])){
+            $this->title = $params['title'];
+        }
         $this->description = isset($params['description']) ? (string) $params['description'] : '';
         $this->property_name = isset($params['property_name']) ? (string) $params['property_name'] : null;
     }
@@ -52,5 +58,15 @@ class ApiConverter
 
     public function __toString(){
         return get_class($this);
+    }
+    public function getTitle(){
+        return $this->title;
+    }
+
+    public function getType(){
+        return $this->type;
+    }
+    public function getFormat(){
+        return $this->format;
     }
 }

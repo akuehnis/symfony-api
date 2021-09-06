@@ -11,6 +11,10 @@ class BodyResolver implements ArgumentValueResolverInterface
 
     public function supports(Request $request, ArgumentMetadata $argument)
     {
+        if (!$this->RouteService->isApiRoute($request)){
+            return false;
+        }
+        
         $type = $argument->getType();
         if (!is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
             return false;
@@ -30,7 +34,7 @@ class BodyResolver implements ArgumentValueResolverInterface
 
     public function resolveClass($classname, $data){
         $annotationReader = new AnnotationReader();
-        $obj = new $classname;
+        $obj = new $classname();
         $reflection = new \ReflectionClass($classname);
         $submitted_data = [];
         foreach ($reflection->getProperties() as $property){

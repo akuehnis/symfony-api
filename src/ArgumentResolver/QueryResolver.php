@@ -24,6 +24,9 @@ class QueryResolver implements ArgumentValueResolverInterface
      */
     public function supports(Request $request, ArgumentMetadata $argument)
     {
+        if (!$this->RouteService->isApiRoute($request)){
+            return false;
+        }
         // converter can be defined as method annotation
         $converter = $this->getConverterFromAnnotation($request, $argument);
         if ($converter) {
@@ -79,11 +82,16 @@ class QueryResolver implements ArgumentValueResolverInterface
         yield $converter->denormalize();
     }
 
+    
+
 
     public function getConverterFromAnnotation($request, $argument){
         $name = $argument->getName();
         $annotationReader = new AnnotationReader();
         $routeName = $request->attributes->get('_route');
+        if (!$routeName){
+            return null;
+        }
         $route = $this->RouteService->getRouteByName($routeName);
         $reflection = $this->RouteService->getMethodReflection($route);
         $annotations = $annotationReader->getMethodAnnotations($reflection);

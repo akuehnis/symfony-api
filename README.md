@@ -89,11 +89,11 @@ Clear the cache after making any changes.
 Symfony-API will only add routes to the documentation where an annotation of
 Akuehnis\SymfonyApi\AnnotationsSymfonyApi is present.
 
-The following code snipped shows two controller functions. Both of them will be processed by 
-Symfony-API, however, only the first will be in the documentation because it has the 
-Tag annotation.
+For scalar Values (int, bool, string, float, array) there are default converters already present.
 
-For documentation, PHPDoc-Comments will be used (see exmple below).
+For any other value types, converters can be passed with annotations.
+
+As of PHP 8.1, converters can also be passed as objects as  function parameter default value.
 
 ```
 <?php
@@ -101,6 +101,8 @@ For documentation, PHPDoc-Comments will be used (see exmple below).
 namespace App\Controller
 
 use App\Schemas\MyOutputModel;
+
+use App\Converter\DateConverter;
 
 class DefaultController
 {
@@ -111,19 +113,17 @@ class DefaultController
      *
      * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
      * @Route("/hello/{$one}", name="app_hello", methods={"GET"})
-     * @param string $one Path parameter
-     * @param string $two Query parameter, required, not null
-     * @param int $three Query parameter, required, nullable
-     * @param bool $four Query parameter, not required, not null
-     * @param float $five Query parameter, nor required, nullable
-     * @return \App\Schemas\OutputModel The output model
+     * @DateConverter(property_name="start_date", title="abcd" )
      */
     public function hello(
         string $one
         string $two,
         ?int $three,
         bool $four = false,
-        ?float $five = null
+        ?float $five = null,
+
+        ?\DateTime $start_date = null,
+        ?\DateTime $end_date = new DateConverter(['defaultValue' => null])
     ){
         $model = new MyOutputModel();
         // ... more code
@@ -138,7 +138,7 @@ class DefaultController
 
 ## Body Model
 
-The model MUST use ApiBaseTrait
+The model MUST extend Akuehnis\SymfonyApi\Models\ApiBaseModel.
 
 ```
 <?php
@@ -149,12 +149,9 @@ namespace App\Schemas;
 use Symfony\Component\Validator\Constraints as Assert;
 use DateTimeInterface;
 
-use Akuehnis\SymfonyApi\Models\ApiBaseTrait;
+use Akuehnis\SymfonyApi\Models\ApiBaseModel; 
 
-class MyInputModel  {
-
-    use ApiBaseTrait;
-
+class MyInputModel extends  ApiBaseModel {
 
     /**
      * @var string $name Required property, not null
@@ -202,8 +199,7 @@ class DefaultController
 
 ## Return Model
 
-If the return class must be documented in the PHPDocBlock, not as a return typehint. 
-The reason for this is that the returned type may be different.
+The class of the return model must be passed with annotations.  
 
 If the return Model is a class extending the BaseModel, it will automatically be serialized to Json.
 
@@ -214,10 +210,9 @@ If the return Model is a class extending the BaseModel, it will automatically be
 
 namespace App\Schemas;
 
-use Akuehnis\SymfonyApi\Models\ApiBaseTrait;
+use Akuehnis\SymfonyApi\Models\ApiBaseModel;
 
-class MyOutputModel {
-    use ApiBaseTrait;
+class MyOutputModel extends ApiBaseModel {
     /**
      * @var string $name The name property
      */
@@ -235,12 +230,16 @@ namespace App\Controller;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+use Akuehnis\SymfonyApi\Annotations\Tag as SymfonyApiTag;
+use Akuehnis\SymfonyApi\Annotations\ResponseModel as SymfonyApiResponseModel;
+
 use App\Schemas\MyOutputModel;
 
 class DefaultController
 {
     /**
      * @Akuehnis\SymfonyApi\AnnotationsSymfonyApi(tag="abrakadabra")
+     * @SymfonyApiResponseModel(name="App\Schemas\MyOutputModel")
      * @Route("/testoutput, name="app_testoutput", methods={"GET"})
      * @Return MyOutputModel Define the output model here
      */
