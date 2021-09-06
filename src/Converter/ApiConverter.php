@@ -1,7 +1,7 @@
 <?php
 namespace Akuehnis\SymfonyApi\Converter;
 
-
+/** @Annotation */
 class ApiConverter
 {
 
@@ -21,6 +21,11 @@ class ApiConverter
      */
     public $description = '';
 
+    /**
+     * Property Name. Only for property converters which must be passed as method annotation (prior to PHP 8.1)
+     */
+    public ?string $property_name = null;
+
     public function __construct($params = [])
     {
         if (isset($params['defaultValue'])){
@@ -28,6 +33,7 @@ class ApiConverter
         }
         $this->title = isset($params['title']) ? (string) $params['title'] : get_class($this);
         $this->description = isset($params['description']) ? (string) $params['description'] : '';
+        $this->property_name = isset($params['property_name']) ? (string) $params['property_name'] : null;
     }
 
     /**

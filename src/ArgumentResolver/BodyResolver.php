@@ -4,20 +4,10 @@ namespace Akuehnis\SymfonyApi\ArgumentResolver;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Controller\ArgumentValueResolverInterface;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadata;
+use Doctrine\Common\Annotations\AnnotationReader;
 
-use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
-use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
-use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
-use Akuehnis\SymfonyApi\Services\DocBuilder;
 class BodyResolver implements ArgumentValueResolverInterface
 {
-    private $security;
-    private $DocBuilder;
-
-    public function __construct(DocBuilder $DocBuilder)
-    {
-        $this->DocBuilder = $DocBuilder;
-    }
 
     public function supports(Request $request, ArgumentMetadata $argument)
     {
@@ -32,14 +22,15 @@ class BodyResolver implements ArgumentValueResolverInterface
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
         $classname = $argument->getType();
-        $obj = $this->resolveClass($classname, $request);
+        $data = json_decode($request->getContent(), true);
+        $obj = $this->resolveClass($classname, $data);
 
         yield $obj;
     }
 
-    public function resolveClass($classname, $request){
+    public function resolveClass($classname, $data){
+        $annotationReader = new AnnotationReader();
         $obj = new $classname;
-        $data = json_decode($request->getContent(), true);
         $reflection = new \ReflectionClass($classname);
         $submitted_data = [];
         foreach ($reflection->getProperties() as $property){
@@ -47,25 +38,41 @@ class BodyResolver implements ArgumentValueResolverInterface
                 continue;
             }
             $reflection_type = $property->getType();
+            if (!$reflection_type) {
+                continue;
+            }
             $type = $reflection_type->getName();
             $name = $property->getName();
+            $converter = null;
             if (!array_key_exists($name, $data)){
                 continue;
             }
-            if (!$property->hasDefaultValue() || !is_object($property->getDefaultValue())){
-                $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
-                if ($property->hasDefaultValue()){
-                    $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
-                } else {
-                    $converter = new $className([]);
-                }
+            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                $obj->name = $this->resolveClass($type, $data[$name]);
             } else {
-                $converter = $property->getDefaultValue();
-            }
-            if (isset($data[$name])){
-                $converter->value = $data[$name];
-                $obj->{$name} = $converter->denormalize();
-                $submitted_data[$name] = $obj->{$name};
+                $annotations = $annotationReader->getPropertyAnnotations($property);
+                foreach ($annotations as $annotation){
+                    if (is_object($annotation) && is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
+                        $converter = $annotation;
+                    }
+                }
+                if (!$converter){
+                    if (in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
+                        $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                        if ($property->hasDefaultValue()){
+                            $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
+                        } else {
+                            $converter = new $className([]);
+                        }
+                    } else {
+                        throw new \Exception("No converter found for " . $name);
+                    }
+                }
+                if (isset($data[$name])){
+                    $converter->value = $data[$name];
+                    $obj->{$name} = $converter->denormalize();
+                    $submitted_data[$name] = $obj->{$name};
+                }
             }
         }
         $obj->storeSubmittedData($submitted_data);

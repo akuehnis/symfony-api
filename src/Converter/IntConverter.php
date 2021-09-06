@@ -3,7 +3,7 @@ namespace Akuehnis\SymfonyApi\Converter;
 
 use Symfony\Component\Validator\Constraints as Assert;
 
-
+/** @Annotation */
 class IntConverter extends ApiConverter
 {
 

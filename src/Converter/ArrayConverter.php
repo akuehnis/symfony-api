@@ -4,19 +4,19 @@ namespace Akuehnis\SymfonyApi\Converter;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /** @Annotation */
-class FloatConverter extends ApiConverter
+class ArrayConverter extends ApiConverter
 {
 
     /**
-     * @Assert\Type("float")
+     * @Assert\Type("array")
      */
     public $value;
 
     public function denormalize(){
-        return (float)$this->value;
+        return (array)$this->value;
     }
 
     public function normalize($value){
-        $this->value = (float) $value;
+        $this->value = (array) $value;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 namespace Akuehnis\SymfonyApi\Converter;
 
-
+/** @Annotation */
 class BoolConverter extends ApiConverter
 {
 
