@@ -4,20 +4,17 @@ namespace Akuehnis\SymfonyApi\Converter;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /** @Annotation */
-class IntConverter extends ApiConverter
+class IntConverter extends ValueConverter
 {
 
     /**
-     * 
-     * @Assert\Regex(
-     * pattern="/^[0-9]+/",
-     * message="Only numbers allowed"
-     * )
      */
     public $value;
 
 
-    public string $type = 'integer';
+    private array $schema = [
+        'type' => 'integer',
+    ];
 
     public function denormalize(){
         return (int)$this->value;
@@ -26,4 +23,14 @@ class IntConverter extends ApiConverter
     public function normalize( $value){
         $this->value = (int) $value;
     }
+
+    public function validate():array
+    {
+        $errors = [];
+        if (false === preg_match('/^[0-9]+/', $this->value)) {
+            $errors[] = 'Only numbers allowed';
+        }
+        return $errors;
+    }
+    
 }

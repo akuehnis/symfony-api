@@ -12,7 +12,8 @@ class QueryResolver implements ArgumentValueResolverInterface
 {
     protected $RouteService;
 
-    private $base_types =  ['string', 'int', 'float', 'bool', 'array'];
+    protected $converters = [];
+    protected $converter_idx = [];
 
     public function __construct(RouteService $RouteService)
     {
@@ -24,33 +25,23 @@ class QueryResolver implements ArgumentValueResolverInterface
      */
     public function supports(Request $request, ArgumentMetadata $argument)
     {
-        if (!$this->RouteService->isApiRoute($request)){
-            return false;
-        }
-        // converter can be defined as method annotation
-        $converter = $this->getConverterFromAnnotation($request, $argument);
-        if ($converter) {
-            return true;
-        }
-        
-        // base types automatically have a converter
-        $type = $argument->getType();
-        if (in_array($type, $this->base_types)) {
-            return true;
-        }
-
-        // converters can be passed as default values (from PHP 8.1)
-        if (version_compare(PHP_VERSION, '8.1.', '>=')){
-            if (!$argument->hasDefaultValue()){
+        $name = $argument->getName();
+        if (0 == count($this->converters)){
+            var_dump('lade');
+            $route = $this->RouteService->getRouteFromRequest($request);
+            if (!$route){
                 return false;
             }
-            $defaultValue = $argument->getDefaultValue();
-            if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
-                return true;
-            }
+            $this->converters = $this->RouteService->getRouteParamConverters($route);
         }
-
-        return false;
+        if (0 == count($this->converters)){
+            return false;
+        } else {
+            $filtered_converters = array_filter($this->converters, function($c) use ($name){
+                return $name == $c->getName();
+            });
+            return 0 < count($filtered_converters);
+        }
     }
 
     /**
@@ -58,49 +49,22 @@ class QueryResolver implements ArgumentValueResolverInterface
      */
     public function resolve(Request $request, ArgumentMetadata $argument)
     {
-        $type = $argument->getType();
         $name = $argument->getName();
-        $converter = $this->getConverterFromAnnotation($request, $argument);
-        $defaultValue = $argument->getDefaultValue();
-        if (version_compare(PHP_VERSION, '8.1.', '>=')){
-            if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
-                // even if converter is found in annotations, converters passed as default value must have priority
-                $converter = $defaultValue;
-            }
-        }
-        if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
-            $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
-            $converter = new $className(['defaultValue' => $defaultValue]); 
-        }
-        if (!$converter){
-            return;
-        }
-        $value = $request->query->get($name);
-        if (null !== $value){
-            $converter->value = $value;
-        } 
-        yield $converter->denormalize();
-    }
-
-    
-
-
-    public function getConverterFromAnnotation($request, $argument){
-        $name = $argument->getName();
-        $annotationReader = new AnnotationReader();
-        $routeName = $request->attributes->get('_route');
-        if (!$routeName){
-            return null;
-        }
-        $route = $this->RouteService->getRouteByName($routeName);
-        $reflection = $this->RouteService->getMethodReflection($route);
-        $annotations = $annotationReader->getMethodAnnotations($reflection);
-        $converter_annotations = array_filter($annotations, function($item) use ($name) {
-            return is_subclass_of($item, 'Akuehnis\SymfonyApi\Converter\ApiConverter')
-                && $item->property_name == $name;
+        $query_values = $request->query->all();
+        $path_values = $request->attributes->all();
+        $filtered_converters = array_filter($this->converters, function($c) use ($name){
+            return $name == $c->getName();
         });
-        $converter = array_shift($converter_annotations);
-
-        return $converter;
+        $converter = array_shift($filtered_converters);
+        $location = $converter->getLocation();
+        if ('query' == array_shift($location) && isset($query_values[$name])){
+            $converter->setValue($query_values[$name]);
+        } else if ('path' == array_shift($location) && isset($path_values[$name])){
+            $converter->setValue($path_values[$name]);
+        } else if ('body' == array_shift($location) && isset($path_values[$name])){
+            $data = json_decode($request->getContent(), true);
+            $converter->setValue($data);
+        }
+        yield $converter->denormalize();
     }
 }

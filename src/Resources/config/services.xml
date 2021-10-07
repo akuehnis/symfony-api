@@ -9,15 +9,13 @@
         <service id="Akuehnis\SymfonyApi\Services\RouteService">
             <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
         </service>
+
+        <service id="Akuehnis\SymfonyApi\Services\ModelService">
+        </service>
         
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
             <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
             <tag name="controller.argument_value_resolver" priority="200"/>
-        </service>
-
-        <service id="Akuehnis\SymfonyApi\ArgumentResolver\BodyResolver">
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
-            <tag name="controller.argument_value_resolver" priority="50"/>
         </service>
 
         <service id="Akuehnis\SymfonyApi\EventSubscriber\ResponseSubscriber">
@@ -26,8 +24,9 @@
         </service>
 
         <service id="Akuehnis\SymfonyApi\EventSubscriber\RequestValidationSubscriber">
+            <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
+            <argument type="service" id="Symfony\Component\Validator\Validator\ValidatorInterface" />
             <tag name="kernel.event_subscriber" />
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
         </service>
 
         <service id="Akuehnis\SymfonyApi\Services\DocBuilder">

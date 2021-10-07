@@ -15,9 +15,20 @@ class ResponseModel {
      */
     public $name;
 
+    /**
+     * Http Status.
+     *
+     * @var int
+     */
+    public $state = 200;
+
+
     public function __construct($props){
         if (isset($props['name'])) {
             $this->name = $props['name'];
+        }
+        if (isset($props['state'])) {
+            $this->state = $props['state'];
         }
     }
 }

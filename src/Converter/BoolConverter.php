@@ -2,12 +2,14 @@
 namespace Akuehnis\SymfonyApi\Converter;
 
 /** @Annotation */
-class BoolConverter extends ApiConverter
+class BoolConverter extends ValueConverter
 {
 
     public $value;
 
-    public string $type = 'boolean';
+    private array $schema = [
+        'type' => 'boolean'
+    ];
 
     public function denormalize(){
         return (bool)$this->value;
@@ -15,5 +17,10 @@ class BoolConverter extends ApiConverter
 
     public function normalize($value){
         $this->value = (bool) $value;
+    }
+
+    public function validate():array
+    {
+        return [];
     }
 }

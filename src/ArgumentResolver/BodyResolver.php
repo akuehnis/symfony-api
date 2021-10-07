@@ -5,22 +5,29 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Controller\ArgumentValueResolverInterface;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadata;
 use Doctrine\Common\Annotations\AnnotationReader;
+use Akuehnis\SymfonyApi\Services\ModelService;
+use Akuehnis\SymfonyApi\Services\RouteService;
 
+// DEPRICATED, kann wohl gelöscht werden
 class BodyResolver implements ArgumentValueResolverInterface
 {
 
+    protected $ModelService;
+    protected $RouteService;
+
+    public function __construct(ModelService $ModelService, RouteService $RouteService){
+        $this->ModelService = $ModelService;
+        $this->RouteService = $RouteService;
+    }
+
     public function supports(Request $request, ArgumentMetadata $argument)
     {
-        if (!$this->RouteService->isApiRoute($request)){
-            return false;
-        }
-        
         $type = $argument->getType();
-        if (!is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
-            return false;
+        if ($this->RouteService->isApiRoute($request) && is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+            return true;
         }
         
-        return true;
+        return false;
     }
 
     public function resolve(Request $request, ArgumentMetadata $argument)
@@ -54,23 +61,9 @@ class BodyResolver implements ArgumentValueResolverInterface
             if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
                 $obj->name = $this->resolveClass($type, $data[$name]);
             } else {
-                $annotations = $annotationReader->getPropertyAnnotations($property);
-                foreach ($annotations as $annotation){
-                    if (is_object($annotation) && is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Converter\ApiConverter')){
-                        $converter = $annotation;
-                    }
-                }
+                $converter = $this->ModelService->getPropertyConverter($property);
                 if (!$converter){
-                    if (in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
-                        $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
-                        if ($property->hasDefaultValue()){
-                            $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
-                        } else {
-                            $converter = new $className([]);
-                        }
-                    } else {
-                        throw new \Exception("No converter found for " . $name);
-                    }
+                    throw new \Exception("No converter found for " . $name);
                 }
                 if (isset($data[$name])){
                     $converter->value = $data[$name];

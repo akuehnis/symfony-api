@@ -4,7 +4,7 @@ namespace Akuehnis\SymfonyApi\Converter;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /** @Annotation */
-class FloatConverter extends ApiConverter
+class FloatConverter extends ValueConverter
 {
 
     /**
@@ -12,9 +12,10 @@ class FloatConverter extends ApiConverter
      */
     public $value;
 
-    public string $type = 'number';
-
-    public ?string $format = 'float';
+    private array $schema = [
+        'type' => 'number',
+        'format' => 'float'
+    ];
 
     public function denormalize(){
         return (float)$this->value;
@@ -23,4 +24,14 @@ class FloatConverter extends ApiConverter
     public function normalize($value){
         $this->value = (float) $value;
     }
+
+    public function validate():array
+    {
+        $errors = [];
+        if (!is_float($this->value)){
+            $errors[] = 'Value must be float';
+        }
+        return $errors;
+    }
+    
 }

@@ -4,7 +4,7 @@ namespace Akuehnis\SymfonyApi\Converter;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /** @Annotation */
-class ArrayConverter extends ApiConverter
+class ArrayConverter extends ValueConverter
 {
 
     /**
@@ -12,7 +12,9 @@ class ArrayConverter extends ApiConverter
      */
     public $value;
 
-    public string $type = 'array';
+    private array $schema = [
+        'type' => 'array'
+    ];
 
     public function denormalize(){
         return (array)$this->value;
@@ -20,5 +22,14 @@ class ArrayConverter extends ApiConverter
 
     public function normalize($value){
         $this->value = (array) $value;
+    }
+
+    public function validate():array
+    {
+        $errors = [];
+        if (!is_array($this->value)){
+            $errors[] = 'Value must be array';
+        }
+        return $errors;
     }
 }

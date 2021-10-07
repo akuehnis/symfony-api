@@ -19,7 +19,7 @@ class DocBuilder
     protected $config_documentation = [];
     protected $RouteService;
 
-    private $base_types =  ['string', 'int', 'float', 'bool'];
+    private $base_types =  ['string', 'int', 'float', 'bool', 'array'];
 
     public function __construct(
         UrlGeneratorInterface $UrlGeneratorInterface
@@ -414,7 +414,7 @@ class DocBuilder
                     if (in_array($type, ['bool', 'int', 'string', 'float', 'array'])){
                         $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
                         if ($property->hasDefaultValue()){
-                            $converter = new $className(['defaultValue' => $property->getDefaultValue()]);
+                            $converter = new $className(['default_value' => $property->getDefaultValue()]);
                         } else {
                             $converter = new $className([]);
                         }

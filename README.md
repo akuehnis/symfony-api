@@ -2,12 +2,10 @@
 
 Symfony-API allows to build and document APIs.
 
+This Project is neither productive nor usable at all. No time to finish it.
+
 The project is inspired by https://fastapi.tiangolo.com/ (Python) and NelmioApiDocBundle (https://github.com/nelmio/NelmioApiDocBundle).
 
-The basic idea: Describe your API Endpoints and path variables as usual Symfony routes. 
-Additional query parameters, input and output model are described using PHP Type hinting.
-
-Symfony-API automatically validates input model and returns 400 error if invalid.
 
 ## Installation
 
@@ -84,7 +82,7 @@ akuehnis_symfony_api:
 
 Clear the cache after making any changes.
 
-### Typehinting and Php Docblock define the Openapi Models
+### Typehinting defines the openapi model
 
 Symfony-API will only add routes to the documentation where an annotation of
 Akuehnis\SymfonyApi\AnnotationsSymfonyApi is present.
