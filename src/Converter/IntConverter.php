@@ -7,28 +7,27 @@ use Symfony\Component\Validator\Constraints as Assert;
 class IntConverter extends ValueConverter
 {
 
-    /**
-     */
-    public $value;
-
 
     private array $schema = [
         'type' => 'integer',
     ];
 
-    public function denormalize(){
-        return (int)$this->value;
+    public function denormalize($value){
+        return (int)$value;
     }
 
     public function normalize( $value){
-        $this->value = (int) $value;
+        return (int) $value;
     }
 
-    public function validate():array
+    public function validate($value):array
     {
         $errors = [];
-        if (false === preg_match('/^[0-9]+/', $this->value)) {
-            $errors[] = 'Only numbers allowed';
+        if (!preg_match('/^[0-9]+/', $value)) {
+            $errors[] = [
+                'loc' => $this->getLocation(),
+                'msg' => 'Only integers allowed',
+            ];
         }
         return $errors;
     }

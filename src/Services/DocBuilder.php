@@ -95,7 +95,7 @@ class DocBuilder
             foreach($reflection->getParameters() as $param){
                 $type = $param->getType();
                 $name = $param->getName();
-                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
                     // will be used below, see request_body
                     continue;
                 }
@@ -162,7 +162,7 @@ class DocBuilder
             foreach ($reflection->getParameters() as $param) {
                 $reflection_type = $param->getType();
                 $type = $reflection_type->getName();
-                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+                if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
                     $body_type = $type;
                     break;
                 }
@@ -271,7 +271,7 @@ class DocBuilder
         foreach ($reflection->getParameters() as $param){
             $reflection_type = $param->getType();
             $type = $reflection_type->getName();
-            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
                 $classes[] = $type;
             }
         }
@@ -401,7 +401,7 @@ class DocBuilder
             $type = $reflection_type->getName();
             $name = $property->getName();
             $converter = null;
-            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+            if (is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
                 $obj->name = $this->getDefinitionOfClass($type);
             } else {
                 $annotations = $annotationReader->getPropertyAnnotations($property);

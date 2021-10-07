@@ -7,28 +7,26 @@ use Symfony\Component\Validator\Constraints as Assert;
 class StringConverter extends ValueConverter
 {
 
-    /**
-     * @Assert\Type("string")
-     */
-    public $value;
-
     private array $schema = [
         'type' => 'string'
     ];
 
-    public function denormalize(){
-        return (string)$this->value;
+    public function denormalize($value){
+        return (string)$value;
     }
 
     public function normalize($value){
-        $this->value = (string) $value;
+        return (string) $value;
     }
 
-    public function validate():array
+    public function validate($value):array
     {
         $errors = [];
-        if (!is_string($this->value)){
-            $errors[] = 'Value must be string';
+        if (!is_string($value)){
+            $errors[] = [
+                'loc' => $this->getLocation(),
+                'msg' => 'Value must be string',
+            ];
         }
         return $errors;
     }

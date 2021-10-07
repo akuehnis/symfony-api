@@ -27,7 +27,6 @@ class QueryResolver implements ArgumentValueResolverInterface
     {
         $name = $argument->getName();
         if (0 == count($this->converters)){
-            var_dump('lade');
             $route = $this->RouteService->getRouteFromRequest($request);
             if (!$route){
                 return false;
@@ -57,14 +56,18 @@ class QueryResolver implements ArgumentValueResolverInterface
         });
         $converter = array_shift($filtered_converters);
         $location = $converter->getLocation();
-        if ('query' == array_shift($location) && isset($query_values[$name])){
-            $converter->setValue($query_values[$name]);
-        } else if ('path' == array_shift($location) && isset($path_values[$name])){
-            $converter->setValue($path_values[$name]);
-        } else if ('body' == array_shift($location) && isset($path_values[$name])){
+        if ('query' == $location[0]) {
+            if (isset($query_values[$name])){
+                yield $converter->denormalize($query_values[$name]);
+            } else {
+                yield $converter->denormalize($converter->getValue());
+            }
+        } else if ('path' == $location[0] && isset($path_values[$name])){
+            yield $converter->denormalize($path_values[$name]);
+        } else if ('body' == $location[0]){
             $data = json_decode($request->getContent(), true);
-            $converter->setValue($data);
+            yield $converter->denormalize($data);
         }
-        yield $converter->denormalize();
+        
     }
 }

@@ -7,29 +7,27 @@ use Symfony\Component\Validator\Constraints as Assert;
 class FloatConverter extends ValueConverter
 {
 
-    /**
-     * @Assert\Type("float")
-     */
-    public $value;
-
     private array $schema = [
         'type' => 'number',
         'format' => 'float'
     ];
 
-    public function denormalize(){
-        return (float)$this->value;
+    public function denormalize($value){
+        return (float)$value;
     }
 
     public function normalize($value){
-        $this->value = (float) $value;
+        return (float) $value;
     }
 
-    public function validate():array
+    public function validate($value):array
     {
         $errors = [];
-        if (!is_float($this->value)){
-            $errors[] = 'Value must be float';
+        if (!is_float($value)){
+            $errors[] = [
+                'loc' => $this->getLocation(),
+                'msg' => 'Value must be of type float',
+            ];
         }
         return $errors;
     }

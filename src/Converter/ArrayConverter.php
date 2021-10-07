@@ -7,28 +7,26 @@ use Symfony\Component\Validator\Constraints as Assert;
 class ArrayConverter extends ValueConverter
 {
 
-    /**
-     * @Assert\Type("array")
-     */
-    public $value;
-
     private array $schema = [
         'type' => 'array'
     ];
 
-    public function denormalize(){
-        return (array)$this->value;
+    public function denormalize($value){
+        return (array)$value;
     }
 
     public function normalize($value){
-        $this->value = (array) $value;
+        return (array) $value;
     }
 
-    public function validate():array
+    public function validate($value):array
     {
         $errors = [];
-        if (!is_array($this->value)){
-            $errors[] = 'Value must be array';
+        if (!is_array($value)){
+            $errors[] = [
+                'loc' => $this->getLocation(),
+                'msg' => 'Value must be of type array',
+            ];
         }
         return $errors;
     }

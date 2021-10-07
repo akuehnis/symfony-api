@@ -6,12 +6,10 @@ class ValueConverter
 {
 
     /**
-     * The Api Value
-     * 
-     * However, there are getters and setters for this value.
+     * The default value, do not specify a type
      * 
      */
-    public $value;
+    private $default_value;
 
     /**
      * Property Name.
@@ -47,7 +45,7 @@ class ValueConverter
     public function __construct($params = [])
     {
         if (isset($params['default_value'])){
-            $this->normalize($params['default_value']);
+            $this->setDefaultValue($this->normalize($params['default_value']));
         }
         if (isset($params['schema'])){
             $this->setSchema($params['schema']);
@@ -70,31 +68,31 @@ class ValueConverter
     }
 
     /**
-     * Turns the API Value into the internal Value
+     * Converts api's value to internal value
      */
-    public function denormalize(){
-        return $this->value;
+    public function denormalize($value){
+        return $value;
     }
 
     /**
-     * Turns the Internal value into the API value
+     * Converts the internal value to api's value
      */
     public function normalize($value){
-        $this->value = $value;
+        return $value;
     }
 
     /**
-     * Set the API-Side Value
+     * Set the default value, do not specify type
      */
-    public function setValue($value){
-        $this->value = $value;
+    public function setDefaultValue($default_value){
+        $this->default_value = $default_value;
     }
 
     /**
-     * Get the API-Side Value
+     * Get the default value, do not specify type
      */
-    public function getValue(){
-        return $this->value;
+    public function getDefaultValue(){
+        return $this->default_value;
     }
 
     /**
@@ -167,9 +165,15 @@ class ValueConverter
     }
 
     /**
-     * Returns list of error strings or empty array if valid
+     * Returns list of errors empty array if valid
+     * 
+     * an error is an array of this format:
+     * [
+     *      loc: []string
+     *      msg: string
+     * ]
      */
-    public function validate():array
+    public function validate($value):array
     {
         return [];
     }

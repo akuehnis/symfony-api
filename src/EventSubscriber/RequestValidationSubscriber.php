@@ -46,32 +46,23 @@ class RequestValidationSubscriber implements EventSubscriberInterface
         foreach ($param_converters as $converter){
             $name = $converter->getName();
             $location = $converter->getLocation();
-            if ('query' == array_shift($location)){
+            if ('query' == $location[0]){
                 if ($converter->getRequired() && !isset($values[$name])){
                     $errors[] = [
                         'loc' => array_merge($converter->getLocation(), [$name]),
                         'msg' => 'Required',
                     ];
                     continue;
-                } else if (isset($values[$name])){
-                    $converter->setValue($values[$name]);
-                }
-            } else if ('path' == array_shift($location)){
-                $converter->setValue($path_values[$name]);
-            } else if  ('body' == array_shift($location)){
-                die('da');
+                } 
+                $violations = $converter->validate($values[$name]);
+            } else if ('path' == $location[0]){
+                $violations = $converter->validate($path_values[$name]);
+            } else if  ('body' == $location[0]){
                 $data = json_decode($request->getContent(), true);
-                $converter->setValue($data);
+                $violations = $converter->validate($data);
             }
-            $violations = $converter->validate();
             if (0 < count($violations)) {
-                var_dump($location);
-                foreach ($violations as $error){
-                    $errors[] = [
-                        'loc' => array_merge($location, [$name]),
-                        'msg' => $error,
-                    ];
-                }
+                $errors = array_merge($errors, $violations);
             }
         }
         if (0 < count($errors)){
@@ -80,5 +71,6 @@ class RequestValidationSubscriber implements EventSubscriberInterface
                 'errors' => $errors,
             ], 400));
         }
+
     }
 }

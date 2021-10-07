@@ -15,10 +15,5 @@ class ErrorModel
      * Message, info about error
      */
     public string $msg; 
-
-    /**
-     * Type of error
-     */
-    public ?string $type = null;
     
 }

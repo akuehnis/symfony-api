@@ -4,7 +4,7 @@ namespace Akuehnis\SymfonyApi\Models;
 /**
  * Api Input und Output-Models müssen diese Klasse erweitern
  */
-class ApiBaseModel 
+class BaseModel 
 {
     private $symfony_api_submitted_data = null;
 

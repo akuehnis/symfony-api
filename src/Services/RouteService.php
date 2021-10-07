@@ -130,7 +130,7 @@ class RouteService
                 ]);
             }
         }
-        if (!$converter && is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\ApiBaseModel')){
+        if (!$converter && is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
             $className = 'Akuehnis\SymfonyApi\Converter\BaseModelConverter';
             if ($parameter_reflection->isDefaultValueAvailable()){
                 $converter = new $className([

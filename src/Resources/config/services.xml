@@ -10,16 +10,12 @@
             <argument type="service" id="Symfony\Component\Routing\Generator\UrlGeneratorInterface" />
         </service>
 
-        <service id="Akuehnis\SymfonyApi\Services\ModelService">
-        </service>
-        
         <service id="Akuehnis\SymfonyApi\ArgumentResolver\QueryResolver">
             <argument type="service" id="Akuehnis\SymfonyApi\Services\RouteService" />
             <tag name="controller.argument_value_resolver" priority="200"/>
         </service>
 
         <service id="Akuehnis\SymfonyApi\EventSubscriber\ResponseSubscriber">
-            <argument type="service" id="Akuehnis\SymfonyApi\Services\DocBuilder" />
             <tag name="kernel.event_subscriber" />
         </service>
 
