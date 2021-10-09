@@ -60,7 +60,7 @@ class QueryResolver implements ArgumentValueResolverInterface
             if (isset($query_values[$name])){
                 yield $converter->denormalize($query_values[$name]);
             } else {
-                yield $converter->denormalize($converter->getValue());
+                yield $converter->denormalize($converter->getDefaultValue());
             }
         } else if ('path' == $location[0] && isset($path_values[$name])){
             yield $converter->denormalize($path_values[$name]);

@@ -42,6 +42,16 @@ If not visble, then maybe assets were not installed yet:
 bin/console assets:install
 ```
 
+Above example will use the area named 'default' (see configuration). If different areas shall be used, you may use the following route configuration:
+
+```
+# config/routes.yaml
+app.swagger_ui_areas:
+    path: /api/doc/{area}
+    methods: GET
+    defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
+```
+
 ### Openapi JSON
 
 If Openapi JSON is required, add a route of your choice in your routes.yaml 
@@ -52,7 +62,17 @@ Example:
 ```
 # config/routes.yaml
 app.swagger:
-    path: /api/doc.json
+    path: /api/doc_json
+    methods: GET
+    defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
+```
+
+Above example will use the area named 'default' (see configuration). If different areas shall be used, you may use the following route configuration:
+
+```
+# config/routes.yaml
+app.swagger_areas:
+    path: /api/doc_json/{area}
     methods: GET
     defaults: { _controller: akuehnis.symfony_api.controller.doc_json }
 ```
@@ -62,23 +82,32 @@ app.swagger:
 ```
 # config/packages/akuehnis_symfony_api.yaml
 akuehnis_symfony_api:
-    documentation:
-        servers: 
-            - url: https://api.example.com/v1
-            - url: http://api.example.com/v1
-        info:
-            title: API Tile
-            description: API Description
-            version: 1.0.0
-        components: 
-            securitySchemes:
-                api_key:
-                    type: apiKey
-                    name: X-API-KEY
-                    in: header
-        security:
-            - api_key: [] 
+    areas:
+        default:
+            path_patterns:
+                - ^/api(?!/doc.*$)
+            name_patterns:
+                - ^api_.*$
+            documentation:
+                servers: 
+                    - url: https://api.example.com/v1
+                    - url: http://api.example.com/v1
+                info:
+                    title: API Tile
+                    description: API Description
+                    version: 1.0.0
+                components: 
+                    securitySchemes:
+                        api_key:
+                            type: apiKey
+                            name: X-API-KEY
+                            in: header
+                security:
+                    - api_key: [] 
 ```
+There can be multiple areas, e.g. for multiple API Versions.
+
+Use path_patterns and name_patterns to specify the routes included in the specific area.
 
 Clear the cache after making any changes.
 

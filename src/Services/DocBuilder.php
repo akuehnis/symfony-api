@@ -58,7 +58,7 @@ class DocBuilder
             : [];
         foreach ($routes as $name=>$route){
             if ($this->matchPath($route, $path_patterns)
-                && $this->matchName($name, $name_patterns)
+            && $this->matchName($name, $name_patterns)
             ){
                 $routes_of_interest[] = $route;
             }
@@ -105,6 +105,9 @@ class DocBuilder
                 }
                 return true;
             });
+            if (0 == count($methods)){
+                $methods[] = 'GET';
+            }
             $tag_annotations = $route_descriptions = $this->RouteService->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\Tag');
             foreach ($tag_annotations as $annotation) {
                 $tags[] = $annotation->name;

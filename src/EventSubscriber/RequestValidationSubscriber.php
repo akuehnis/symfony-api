@@ -46,6 +46,7 @@ class RequestValidationSubscriber implements EventSubscriberInterface
         foreach ($param_converters as $converter){
             $name = $converter->getName();
             $location = $converter->getLocation();
+            $violations = [];
             if ('query' == $location[0]){
                 if ($converter->getRequired() && !isset($values[$name])){
                     $errors[] = [
@@ -53,8 +54,9 @@ class RequestValidationSubscriber implements EventSubscriberInterface
                         'msg' => 'Required',
                     ];
                     continue;
+                } else if (isset($values[$name])){
+                    $violations = $converter->validate($values[$name]);
                 } 
-                $violations = $converter->validate($values[$name]);
             } else if ('path' == $location[0]){
                 $violations = $converter->validate($path_values[$name]);
             } else if  ('body' == $location[0]){
