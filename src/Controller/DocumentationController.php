@@ -18,9 +18,8 @@ class DocumentationController
         $this->DocBuilder = $DocBuilder;
     }
 
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(Request $request, $area = 'default'): JsonResponse
     {
-        $area = 'default';
         return new JsonResponse($this->DocBuilder->getSpec($area));
     }
 }

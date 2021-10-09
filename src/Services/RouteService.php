@@ -84,9 +84,6 @@ class RouteService
 
     public function getRouteParamConverters($route):array
     {
-        if (!$this->isApiRoute($route)){
-            return [];
-        }
         $annotationReader = new AnnotationReader();
         $reflection = $this->getMethodReflection($route);
         if (!$reflection){
@@ -186,11 +183,5 @@ class RouteService
         }
         return $converter;
     }
-
-    public function isApiRoute($route) {
-        $api_annotations = $this->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\Tag');
-        return 0 < count($api_annotations);
-    }
-
 
 }

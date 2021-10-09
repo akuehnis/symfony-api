@@ -50,21 +50,44 @@ class DocBuilder
         $annotationReader = new AnnotationReader();
         $routes = $this->router->getRouteCollection();
         $routes_of_interest = [];
-        foreach ($routes as $route){
-            $allowed = false;
-            if (isset($this->config_areas[$area]) && isset($this->config_areas[$area]['path_patterns'])){
-                foreach ($this->config_areas[$area]['path_patterns'] as $pattern){
-                    $path = $route->getPath();
-                    if (preg_match('{'.$pattern.'}', $path)){
-                        $allowed = true;
-                    } 
-                }
-            }
-            if ($allowed){
+        $path_patterns = isset($this->config_areas[$area]) && isset($this->config_areas[$area]['path_patterns'])
+                ? $this->config_areas[$area]['path_patterns']
+                : [];
+        $name_patterns = isset($this->config_areas[$area]) && isset($this->config_areas[$area]['name_patterns'])
+            ? $this->config_areas[$area]['name_patterns']
+            : [];
+        foreach ($routes as $name=>$route){
+            if ($this->matchPath($route, $path_patterns)
+                && $this->matchName($name, $name_patterns)
+            ){
                 $routes_of_interest[] = $route;
             }
         }
         return $routes_of_interest;
+    }
+
+    public function matchPath($route, $path_patterns): bool
+    {
+        // code from nelmio api docs bundle
+        foreach ($path_patterns as $pathPattern) {
+            if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
+                return true;
+            }
+        }
+
+        return 0 === count($path_patterns);
+    }
+
+    public function matchName($name, $name_patterns): bool
+    {
+        // code from nelmio api docs bundle
+        foreach ($name_patterns as $namePattern) {
+            if (preg_match('{'.$namePattern.'}', $name)) {
+                return true;
+            }
+        }
+
+        return 0 === count($name_patterns);
     }
 
     public function getPaths($routes){

@@ -15,9 +15,8 @@ class DocumentationUiController extends AbstractController
         $this->DocBuilder = $DocBuilder;
     }
 
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, $area='default')
     {
-        $area = 'default';
         return $this->render('@AkuehnisSymfonyApi/swagger_ui.html.twig', [
             'swagger_data' => $this->DocBuilder->getSpec($area)
         ]);
