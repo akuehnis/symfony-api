@@ -5,7 +5,7 @@ namespace Akuehnis\SymfonyApi\Converter;
 class BoolConverter extends ValueConverter
 {
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'boolean'
     ];
 

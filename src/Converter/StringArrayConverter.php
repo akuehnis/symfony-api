@@ -26,7 +26,8 @@ class ArrayConverter extends ValueConverter
 
     }
 
-    public function normalize($data){
+    public function normalize($data)
+    {
         return array_map(function($item){
             return (string) $item;
         }, $data);

@@ -14,21 +14,22 @@ class ArrayConverter extends ValueConverter
     protected array $schema = [
         'type' => 'array',
         'items' => [
-            'type' => 'string'
+            'type' => 'boolean'
         ]
     ];
 
     public function denormalize($data)
     {
         return array_map(function($item){
-            return (string) $item;
+            return (bool) $item;
         }, $data);
 
     }
 
-    public function normalize($data){
+    public function normalize($data)
+    {
         return array_map(function($item){
-            return (string) $item;
+            return (bool) $item;
         }, $data);
     }
 
@@ -42,10 +43,10 @@ class ArrayConverter extends ValueConverter
             ];
         } else {
             foreach ($data as $i => $val){
-                if (!is_string($val)){
+                if (!is_bool($val)){
                     $errors[] = [
                         'loc' => array_merge($this->getLocation(), [$i]),
-                        'msg' => 'Value must be of type string',
+                        'msg' => 'Value must be of type bool',
                     ];
                 }
             }

@@ -7,9 +7,9 @@ use Doctrine\Common\Annotations\AnnotationReader;
 class BaseModelArrayConverter extends BaseModelConverter
 {
 
-    private $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
+    protected $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'array'
     ];
 
@@ -61,6 +61,20 @@ class BaseModelArrayConverter extends BaseModelConverter
         }
         return $rows;
         
+
+    }
+
+    public function getSchema():array 
+    {
+        $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+        $class_schema = [
+            'type' => 'array',
+            'items' => [
+                '$ref' => '#/components/schemas/' . $converter->getClassNameShort()
+            ]
+        ];
+
+        return $class_schema;
 
     }
 

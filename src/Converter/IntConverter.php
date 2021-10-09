@@ -8,7 +8,7 @@ class IntConverter extends ValueConverter
 {
 
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'integer',
     ];
 

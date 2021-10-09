@@ -35,18 +35,51 @@ class RouteService
         return $reflection;
     }
 
-    public function getRouteByName($name){
-        return $this->router->getRouteCollection()->get($name);
-    }
-
+    /**
+     * used in QueryResover and RequestValidationSubscriber
+     */
     public function getRouteFromRequest($request) 
     {
         $routeName = $request->attributes->get('_route');
         if (!$routeName){
             return null;
         }
-        $route = $this->getRouteByName($routeName);
+        $route = $this->router->getRouteCollection()->get($routeName);;
         return $route;
+    }
+
+    public function getRouteResponseConverters($route) 
+    {
+        $response_converters = [];
+        $response_converters[200] = new \Akuehnis\SymfonyApi\Converter\StringConverter();
+        $response_converters[400] = new \Akuehnis\SymfonyApi\Converter\BaseModelConverter([
+            'class_name' => 'Akuehnis\SymfonyApi\Models\Response400'
+        ]);
+        foreach ($this->getRouteAnnotations($route) as $annotation){
+            if (is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Converter\ValueConverter')
+                && method_exists($annotation, 'getName')
+                && 'response' == $annotation->getName()
+            ) {
+                $response_converters[$annotation->getStatus()] =  $annotation;
+            }
+        }
+        return $response_converters;
+    }
+
+    public function getRouteAnnotations($route, ?string $filter_class = null){
+        $annotationReader = new AnnotationReader();
+        $reflection = $this->getMethodReflection($route);
+        if (!$reflection){
+            return [];
+        }
+        $annotations = $annotationReader->getMethodAnnotations($reflection);
+        if ($filter_class){
+            $annotations = array_filter($annotations, function($item) use ($filter_class) {
+                return get_class($item) == $filter_class;
+            });
+        }
+
+        return $annotations;
     }
 
     public function getRouteParamConverters($route):array
@@ -70,21 +103,7 @@ class RouteService
         return $converters;
     }
 
-    public function getRouteAnnotations($route, ?string $filter_class = null){
-        $annotationReader = new AnnotationReader();
-        $reflection = $this->getMethodReflection($route);
-        if (!$reflection){
-            return [];
-        }
-        $annotations = $annotationReader->getMethodAnnotations($reflection);
-        if ($filter_class){
-            $annotations = array_filter($annotations, function($item) use ($filter_class) {
-                return get_class($item) == $filter_class;
-            });
-        }
-
-        return $annotations;
-    }
+    
 
 
     /**
@@ -161,6 +180,9 @@ class RouteService
                 $location = ['body'];
             }
             $converter->setLocation($location);
+            if ('path' == $location[0]){
+                $converter->setRequired(true);
+            }
         }
         return $converter;
     }

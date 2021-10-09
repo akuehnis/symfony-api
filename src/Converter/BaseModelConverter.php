@@ -7,9 +7,9 @@ use Doctrine\Common\Annotations\AnnotationReader;
 class BaseModelConverter extends ValueConverter
 {
 
-    private $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
+    protected $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'object'
     ];
 
@@ -27,6 +27,23 @@ class BaseModelConverter extends ValueConverter
 
     public function getClassName(){
         return $this->class_name;
+    }
+
+    public function getAllClassNames():array
+    {
+        $class_names = [$this->getClassName()];
+        foreach ($this->getPropertyConverters() as $converter){
+            if (is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')){
+                $class_names = array_merge($class_names, $converter->getAllClassNames());
+            }
+        }
+
+        return $class_names;
+    }
+
+    public function getClassNameShort(){
+        $reflect = new \ReflectionClass($this->getClassName());
+        return $reflect->getShortName();
     }
 
     public function denormalize($data)
@@ -63,6 +80,45 @@ class BaseModelConverter extends ValueConverter
 
         return $arr;
 
+    }
+
+    public function getSchema():array 
+    {
+        $property_schemas = [];
+        foreach ($this->getPropertyConverters() as $converter){
+            $name = $converter->getName();
+            $schema = $converter->getSchema();
+            if (get_class($converter) == get_class($this)) {
+                $schema = [
+                    '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                ];
+            }
+            $property_schemas[$name] = $schema;
+        }
+        $class_schema = [
+            'type' => 'object',
+            'properties' => $property_schemas,
+        ];
+
+        return $class_schema;
+
+    }
+
+    public function getPropertySchemas():array
+    {
+        // wird bei Array separeat benutzt
+        $properties = [];
+        foreach ($this->getPropertyConverters() as $converter){
+            $name = $converter->getName();
+            $schema = $converter->getSchema();
+            if (get_class($converter) == get_class($this)) {
+                $schema = [
+                    '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                ];
+            }
+            $properties[$name] = $schema;
+        }
+        return $properties;
     }
 
     public function validate($data):array

@@ -9,37 +9,43 @@ class ValueConverter
      * The default value, do not specify a type
      * 
      */
-    private $default_value;
+    protected $default_value;
 
     /**
      * Property Name.
      */
-    private string $name = '';
+    protected string $name = '';
 
     /**
      * Description of the value in Openapi
      */
-    private $description = '';
+    protected $description = '';
 
     /**
      * openapi schema. 'nullable' is part of the schema
      */
-    private array $schema = [];
+    protected array $schema = [];
 
     /**
      * definition if parameter is required. If not, there must be a default value
      */
-    private $required = false;
+    protected $required = false;
 
     /**
      * definition if parameter is nullable.
      */
-    private $nullable = false;
+    protected $nullable = false;
 
     /**
      * location.
      */
-    private array $location = [];
+    protected array $location = [];
+
+
+    /** 
+     * http status, only for Converters named 'response'
+    */
+    protected int $status = 200;
 
 
     public function __construct($params = [])
@@ -64,6 +70,9 @@ class ValueConverter
         }
         if (isset($params['location'])){
             $this->setLocation($params['location']);
+        }
+        if (isset($params['status'])){
+            $this->setStatus($params['status']);
         }
     }
 
@@ -121,7 +130,16 @@ class ValueConverter
 
     public function getSchema():array
     {
-        return $this->schema;
+        $schema = $this->schema;
+        if ($this->getNullable()){
+            $schema['nullable'] = true;
+        }
+        if (!$this->getRequired()){
+            $schema['default'] = $this->getDefaultValue();
+        }
+
+        return $schema;
+
     }
 
     public function setName(string $name)
@@ -157,6 +175,15 @@ class ValueConverter
 
     public function setLocation(array $location){
         $this->location = $location;
+    }
+
+    public function getStatus():int
+    {
+        return $this->status;
+    }
+
+    public function setStatus(int $status){
+        $this->status = $status;
     }
 
     public function getLocation():array

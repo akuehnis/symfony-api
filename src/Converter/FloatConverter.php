@@ -7,7 +7,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 class FloatConverter extends ValueConverter
 {
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'number',
         'format' => 'float'
     ];

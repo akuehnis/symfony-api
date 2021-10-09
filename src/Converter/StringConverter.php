@@ -7,7 +7,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 class StringConverter extends ValueConverter
 {
 
-    private array $schema = [
+    protected array $schema = [
         'type' => 'string'
     ];
 
