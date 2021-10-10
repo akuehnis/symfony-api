@@ -1,21 +1,18 @@
 {
     "name": "akuehnis/symfony-api",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "type": "library",
-    "description": "Helper to quickly build APIs with Symfony",
+    "description": "Helper to quickly build APIs and OpenAPI description with Symfony",
     "keywords": ["php", "api", "symfony", "documentation", "doc", "rest"],
-    "homepage": "https://azular.com",
+    "homepage": "https://symfonyapi.akuehnis.com",
     "license": "MIT",
     "require": {
-        "php": ">=7.4.",
-        "symfony/validator": "*",
-        "symfony/property-info": "*",
-        "phpdocumentor/reflection-docblock": "*"
+        "php": ">=7.4."
     },
     "authors": [
         {
             "name": "Adrian Kuehnis",
-            "email": "webrequest@azular.com"
+            "email": "symfonyapi@akuehnis.com"
         }
     ],
     "autoload": {
