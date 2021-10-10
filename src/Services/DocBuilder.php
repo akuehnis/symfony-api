@@ -108,7 +108,7 @@ class DocBuilder
             if (0 == count($methods)){
                 $methods[] = 'GET';
             }
-            $tag_annotations = $route_descriptions = $this->RouteService->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\Tag');
+            $tag_annotations = $this->RouteService->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\Tag');
             foreach ($tag_annotations as $annotation) {
                 $tags[] = $annotation->name;
             }
@@ -153,9 +153,10 @@ class DocBuilder
             }
             
             $route_descriptions = $this->RouteService->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\RouteDescription');
-            if (0 < count($route_descriptions)){
-                $summary = $route_descriptions[0]->summary;
-                $description = $route_descriptions[0]->description;
+            $route_description = array_shift($route_descriptions);
+            if ($route_description){
+                $summary = $route_description->summary;
+                $description = $route_description->description;
             } else {
                 $summary = '';
                 $description = '';

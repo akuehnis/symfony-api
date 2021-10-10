@@ -63,10 +63,28 @@ class ValueConverter
             $this->setName($params['name']);
         }
         if (isset($params['required'])){
-            $this->setRequired($params['required']);
+            if (true===$params['required']
+                || 'true' === $params['required']
+                || 'TRUE' === $params['required']
+                || 1 === $params['required']
+                || '1' === $params['required']
+            ) {
+                $this->setRequired(true));
+            } else {
+                $this->setRequired(false));
+            }
         }
         if (isset($params['nullable'])){
-            $this->setNullable($params['nullable']);
+            if (true===$params['nullable']
+                || 'true' === $params['nullable']
+                || 'TRUE' === $params['nullable']
+                || 1 === $params['nullable']
+                || '1' === $params['nullable']
+            ) {
+                $this->setNullable(true));
+            } else {
+                $this->setNullable(false));
+            }
         }
         if (isset($params['location'])){
             $this->setLocation($params['location']);
@@ -164,6 +182,7 @@ class ValueConverter
     }
 
     public function setNullable(bool $nullable){
+        
         $this->nullable = $nullable;
     }
 
