@@ -48,6 +48,9 @@ class BaseModelConverter extends ValueConverter
 
     public function denormalize($data)
     {
+        if (null === $data){
+            return null;
+        }
         $class_name = $this->getClassName();
         $obj = new $class_name();
         foreach ($this->getPropertyConverters() as $converter){
@@ -66,6 +69,9 @@ class BaseModelConverter extends ValueConverter
 
     public function normalize($obj)
     {
+        if (null === $obj){
+            return null;
+        }
         $class_name = $this->getClassName();
         $arr = [];
         foreach ($this->getPropertyConverters() as $converter){
@@ -125,18 +131,19 @@ class BaseModelConverter extends ValueConverter
     {
         $errors = [];
         foreach ($this->getPropertyConverters() as $converter){
-            if ($converter->getRequired() && !isset($data[$converter->getName()])) {
+            $name = $converter->getName();
+            if ($converter->getRequired() && !isset($data[$name])) {
                 $errors[] = [
                     'loc' => $converter->getLocation(),
                     'msg' => 'Required',
                 ];
-            } else if (!$converter->getNullable() && null == $data[$converter->getName()]){
+            } else if (!$converter->getNullable() && isset($data[$name]) && null === $data[$name]){
                 $errors[] = [
                     'loc' => $converter->getLocation(),
                     'msg' => 'Null not allowed',
                 ];
-            } else {
-                $violations = $converter->validate($data[$converter->getName()]);
+            } else if (isset($data[$name])) {
+                $violations = $converter->validate($data[$name]);
                 if (0 < count($violations)){
                     $errors = array_merge($errors, $violations);
                 }

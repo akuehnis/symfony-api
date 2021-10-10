@@ -13,11 +13,11 @@ class FloatConverter extends ValueConverter
     ];
 
     public function denormalize($value){
-        return (float)$value;
+        return null === $value ? null : (float)$value;
     }
 
     public function normalize($value){
-        return (float) $value;
+        return null === $value ? null : (float) $value;
     }
 
     public function validate($value):array

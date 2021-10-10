@@ -20,8 +20,20 @@ class ArrayConverter extends ValueConverter
 
     public function denormalize($data)
     {
-        return array_map(function($item){
-            return (bool) $item;
+        return array_map(function($value){
+            if (null === $value){
+                return null;
+            } else if (
+                $value === true
+                || $value === 'true'
+                || $value === 'TRUE'
+                || $value === 1
+                || $value === '1'
+            ) {
+                return true;
+            } else {
+                return false;
+            }
         }, $data);
 
     }
@@ -29,7 +41,19 @@ class ArrayConverter extends ValueConverter
     public function normalize($data)
     {
         return array_map(function($item){
-            return (bool) $item;
+            if (null === $value){
+                return null;
+            } else if (
+                $value === true
+                || $value === 'true'
+                || $value === 'TRUE'
+                || $value === 1
+                || $value === '1'
+            ) {
+                return true;
+            } else {
+                return false;
+            }
         }, $data);
     }
 
@@ -42,11 +66,25 @@ class ArrayConverter extends ValueConverter
                 'msg' => 'Value must be of type array',
             ];
         } else {
-            foreach ($data as $i => $val){
-                if (!is_bool($val)){
+            foreach ($data as $i => $value){
+                if (
+                    $value === true 
+                    || $value === 'true'
+                    || $value === 'TRUE'
+                    || $value === 1
+                    || $value === '1'
+                    || $value === false
+                    || $value === 'false'
+                    || $value === 'FALSE'
+                    || $value === 0
+                    || $value === '0'
+                    || $value === null
+                ){
+                    // all these values are ok
+                } else {
                     $errors[] = [
                         'loc' => array_merge($this->getLocation(), [$i]),
-                        'msg' => 'Value must be of type bool',
+                        'msg' => 'Value must be type bool',
                     ];
                 }
             }

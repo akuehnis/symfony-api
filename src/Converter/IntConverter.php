@@ -13,11 +13,11 @@ class IntConverter extends ValueConverter
     ];
 
     public function denormalize($value){
-        return (int)$value;
+        return null === $value ? null : (int)$value;
     }
 
     public function normalize( $value){
-        return (int) $value;
+        return null === $value ? null : (int) $value;
     }
 
     public function validate($value):array

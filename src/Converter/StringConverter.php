@@ -12,11 +12,11 @@ class StringConverter extends ValueConverter
     ];
 
     public function denormalize($value){
-        return (string)$value;
+        return null === $value ? null : (string)$value;
     }
 
     public function normalize($value){
-        return (string) $value;
+        return null === $value ? null : (string)$value;
     }
 
     public function validate($value):array

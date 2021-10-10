@@ -20,16 +20,22 @@ class ArrayConverter extends ValueConverter
 
     public function denormalize($data)
     {
-        return array_map(function($item){
-            return (string) $item;
+        return array_map(function($value){
+            if (null === $value){
+                return null;
+            }
+            return (string) $value;
         }, $data);
 
     }
 
     public function normalize($data)
     {
-        return array_map(function($item){
-            return (string) $item;
+        return array_map(function($value){
+            if (null === $value){
+                return null;
+            }
+            return (string) $value;
         }, $data);
     }
 

@@ -35,17 +35,21 @@ class BaseModelArrayConverter extends BaseModelConverter
         $converters = $this->getPropertyConverters();
         $rows = [];
         foreach ($data as $row){
-            $obj = new $class_name();
-            foreach ($converters as $converter){
-                $name = $converter->getName();
-                if (isset($row[$converter->getName()])){
-                    $value = $converter->denormalize($row[$converter->getName()]);
-                } else {
-                    $value = $converter->denormalize($row->getDefaultValue());
+            if (null === $row){
+                $rows[] = null;
+            } else {
+                $obj = new $class_name();
+                foreach ($converters as $converter){
+                    $name = $converter->getName();
+                    if (isset($row[$converter->getName()])){
+                        $value = $converter->denormalize($row[$converter->getName()]);
+                    } else {
+                        $value = $converter->denormalize($row->getDefaultValue());
+                    }
+                    $obj->{$name} = $value;
                 }
-                $obj->{$name} = $value;
+                $rows[] = $obj;
             }
-            $rows[] = $obj;
         }
 
         return $rows;
@@ -56,8 +60,12 @@ class BaseModelArrayConverter extends BaseModelConverter
     {
         $rows = [];
         foreach ($data as $row) {
-            $converter = new BaseModelConverter(['class_name' => get_class($row)]);
-            $rows[] = $converter->normalize($row);
+            if (null === $row){
+                $rows[] = null;
+            } else {
+                $converter = new BaseModelConverter(['class_name' => get_class($row)]);
+                $rows[] = $converter->normalize($row);
+            }
         }
         return $rows;
         
@@ -91,7 +99,7 @@ class BaseModelArrayConverter extends BaseModelConverter
                         'loc' => $converter->getLocation(),
                         'msg' => 'Required',
                     ];
-                } else if (!$converter->getNullable() && null == $row[$converter->getName()]){
+                } else if (!$converter->getNullable() && null === $row[$converter->getName()]){
                     $errors[] = [
                         'loc' => $converter->getLocation(),
                         'msg' => 'Null not allowed',
