@@ -19,7 +19,7 @@ class ValueConverter
     /**
      * Description of the value in Openapi
      */
-    protected $description = '';
+    protected string $description = '';
 
     /**
      * openapi schema. 'nullable' is part of the schema
@@ -29,12 +29,17 @@ class ValueConverter
     /**
      * definition if parameter is required. If not, there must be a default value
      */
-    protected $required = false;
+    protected bool $required = false;
 
     /**
      * definition if parameter is nullable.
      */
-    protected $nullable = false;
+    protected bool $nullable = false;
+
+    /**
+     * definition if parameter is an array.
+     */
+    protected $is_array = false;
 
     /**
      * location.
@@ -69,9 +74,9 @@ class ValueConverter
                 || 1 === $params['required']
                 || '1' === $params['required']
             ) {
-                $this->setRequired(true));
+                $this->setRequired(true);
             } else {
-                $this->setRequired(false));
+                $this->setRequired(false);
             }
         }
         if (isset($params['nullable'])){
@@ -81,9 +86,21 @@ class ValueConverter
                 || 1 === $params['nullable']
                 || '1' === $params['nullable']
             ) {
-                $this->setNullable(true));
+                $this->setNullable(true);
             } else {
-                $this->setNullable(false));
+                $this->setNullable(false);
+            }
+        }
+        if (isset($params['is_array'])){
+            if (true===$params['is_array']
+                || 'true' === $params['is_array']
+                || 'TRUE' === $params['is_array']
+                || 1 === $params['is_array']
+                || '1' === $params['is_array']
+            ) {
+                $this->setIsArray(true);
+            } else {
+                $this->setIsArray(false);
             }
         }
         if (isset($params['location'])){
@@ -148,7 +165,14 @@ class ValueConverter
 
     public function getSchema():array
     {
-        $schema = $this->schema;
+        if ($this->getIsArray()) {
+            $schema =  [
+                'type' => 'array',
+                'items' => $this->schema
+            ];
+        } else {
+            $schema = $this->schema;
+        }
         if ($this->getNullable()){
             $schema['nullable'] = true;
         }
@@ -157,7 +181,6 @@ class ValueConverter
         }
 
         return $schema;
-
     }
 
     public function setName(string $name)
@@ -171,7 +194,8 @@ class ValueConverter
         return $this->name;
     }
 
-    public function setRequired(bool $required){
+    public function setRequired(bool $required)
+    {
         $this->required = $required;
     }
 
@@ -190,6 +214,16 @@ class ValueConverter
     public function getNullable():bool
     {
         return $this->nullable;
+    }
+
+    public function setIsArray(bool $is_array){
+        $this->is_array = $is_array;
+    }
+
+
+    public function getIsArray():bool
+    {
+        return $this->is_array;
     }
 
     public function setLocation(array $location){

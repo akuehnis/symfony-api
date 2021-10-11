@@ -130,19 +130,27 @@ class RouteService
         if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
 
             // For base types we have a converter ready to use
-            $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+            if ('array' == $type){
+                // Defaults to String of arrays
+                $className = 'Akuehnis\SymfonyApi\Converter\StringConverter';
+            } else {
+                $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+            }
+            
             if ($parameter_reflection->isDefaultValueAvailable()){
                 $converter = new $className([
                     'default_value' => $parameter_reflection->getDefaultValue(),
                     'required' => false,
                     'nullable' => $parameter_reflection->allowsNull(),
                     'name' => $name,
+                    'is_array' => 'array' == $type,
                 ]);
             } else {
                 $converter = new $className([
                     'required' => true,
                     'nullable' => $parameter_reflection->allowsNull(),
                     'name' => $name,
+                    'is_array' => 'array' == $type,
                 ]);
             }
         }

@@ -9,9 +9,7 @@ class BaseModelConverter extends ValueConverter
 
     protected $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
 
-    protected array $schema = [
-        'type' => 'object'
-    ];
+    protected array $schema = []; // see getSchema()
 
     public function __construct($params = [])
     {
@@ -33,7 +31,9 @@ class BaseModelConverter extends ValueConverter
     {
         $class_names = [$this->getClassName()];
         foreach ($this->getPropertyConverters() as $converter){
-            if (is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')){
+            if (get_class($converter) ==  'Akuehnis\SymfonyApi\Converter\BaseModelConverter' ||
+                is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')
+            ){
                 $class_names = array_merge($class_names, $converter->getAllClassNames());
             }
         }
@@ -41,73 +41,98 @@ class BaseModelConverter extends ValueConverter
         return $class_names;
     }
 
-    public function getClassNameShort(){
+    public function getClassNameShort()
+    {
         $reflect = new \ReflectionClass($this->getClassName());
         return $reflect->getShortName();
     }
 
-    public function denormalize($data)
+    public function denormalize($value)
     {
-        if (null === $data){
+        if (null === $value){
             return null;
         }
-        $class_name = $this->getClassName();
-        $obj = new $class_name();
-        foreach ($this->getPropertyConverters() as $converter){
-            $name = $converter->getName();
-            if (isset($data[$converter->getName()])){
-                $value = $converter->denormalize($data[$converter->getName()]);
-            } else {
-                $value = $converter->denormalize($converter->getDefaultValue());
+        if ($this->getIsArray()){
+            return array_map(function($val){
+                $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+                return $converter->denormalize($val);
+            }, $value);
+        } else {
+            $class_name = $this->getClassName();
+            $obj = new $class_name();
+            foreach ($this->getPropertyConverters() as $converter){
+                $name = $converter->getName();
+                if (array_key_exists($name, $value)){
+                    $val = $converter->denormalize($value[$name]);
+                } else {
+                    $val = $converter->denormalize($converter->getDefaultValue());
+                }
+                $obj->{$name} = $val;
             }
-            $obj->{$name} = $value;
-        }
 
-        return $obj;
+            return $obj;
+        }
 
     }
 
-    public function normalize($obj)
+    public function normalize($value)
     {
-        if (null === $obj){
+        if (null === $value){
             return null;
         }
-        $class_name = $this->getClassName();
-        $arr = [];
-        foreach ($this->getPropertyConverters() as $converter){
-            $name = $converter->getName();
-            if (property_exists($obj, $name)){
-                $value = $converter->normalize($obj->{$name});
-            } else {
-                $converter->normalize($converter->getDefaultValue());
+        if ($this->getIsArray()){
+            return array_map(function($val){
+                $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+                return $converter->normalize($obj);
+            }, $value);
+        } else {
+            $class_name = $this->getClassName();
+            $arr = [];
+            foreach ($this->getPropertyConverters() as $converter){
+                $name = $converter->getName();
+                if (property_exists($value, $name)){
+                    $val = $converter->normalize($value->{$name});
+                } else {
+                    $val = $converter->normalize($converter->getDefaultValue());
+                }
+                $arr[$name] = $val;
             }
-            $arr[$name] = $value;
+            
+            return $arr;
         }
-
-        return $arr;
 
     }
 
     public function getSchema():array 
     {
-        $property_schemas = [];
-        foreach ($this->getPropertyConverters() as $converter){
-            $name = $converter->getName();
-            $schema = $converter->getSchema();
-            if (get_class($converter) == get_class($this)) {
-                $schema = [
-                    '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
-                ];
+        
+        if ($this->getIsArray()){
+            $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+            $class_schema = [
+                'type' => 'array',
+                'items' => [
+                    '$ref' => '#/components/schemas/' . $converter->getClassNameShort()
+                ]
+            ];
+        } else {
+            $property_schemas = [];
+            foreach ($this->getPropertyConverters() as $converter){
+                $name = $converter->getName();
+                $schema = $converter->getSchema();
+                if (get_class($converter) == get_class($this) && !$converter->getIsArray()) {
+                    $schema = [
+                        '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                    ];
+                }
+                $property_schemas[$name] = $schema;
             }
-            $property_schemas[$name] = $schema;
+            $class_schema = [
+                'type' => 'object',
+                'properties' => $property_schemas,
+            ];
         }
-        $class_schema = [
-            'type' => 'object',
-            'properties' => $property_schemas,
-        ];
 
         return $class_schema;
-
     }
 
     public function getPropertySchemas():array
@@ -127,25 +152,52 @@ class BaseModelConverter extends ValueConverter
         return $properties;
     }
 
-    public function validate($data):array
+    public function validate($value):array
     {
         $errors = [];
-        foreach ($this->getPropertyConverters() as $converter){
-            $name = $converter->getName();
-            if ($converter->getRequired() && !isset($data[$name])) {
+        if (!$this->getNullable() && null === $value) {
+            $errors[] = [
+                'loc' => $this->getLocation(),
+                'msg' => 'Value must not be null',
+            ];
+        } else if ($this->getIsArray()){
+            if (!is_array($value)){
                 $errors[] = [
-                    'loc' => $converter->getLocation(),
-                    'msg' => 'Required',
+                    'loc' => $this->getLocation(),
+                    'msg' => 'Value must be of type array',
                 ];
-            } else if (!$converter->getNullable() && isset($data[$name]) && null === $data[$name]){
-                $errors[] = [
-                    'loc' => $converter->getLocation(),
-                    'msg' => 'Null not allowed',
-                ];
-            } else if (isset($data[$name])) {
-                $violations = $converter->validate($data[$name]);
-                if (0 < count($violations)){
-                    $errors = array_merge($errors, $violations);
+            } else {
+                foreach ($value as $i => $val){
+                    $location = $this->getLocation();
+                    $location[] = $i;
+                    $converter = new BaseModelConverter([
+                        'class_name' => $this->getClassName(),
+                        'location' => $location,
+                    ]);
+                    $violations = $converter->validate($val);
+                    if (0 < count($violations)){
+                        $errors = array_merge($errors, $violations);
+                    }
+                }
+            }
+        } else {
+            foreach ($this->getPropertyConverters() as $converter){
+                $name = $converter->getName();
+                if ($converter->getRequired() && !array_key_exists($name, $value)) {
+                    $errors[] = [
+                        'loc' => $converter->getLocation(),
+                        'msg' => 'Required',
+                    ];
+                } else if (!$converter->getNullable() && array_key_exists($name, $value) && null === $value[$name]){
+                    $errors[] = [
+                        'loc' => $converter->getLocation(),
+                        'msg' => 'Null not allowed',
+                    ];
+                } else if (isset($value[$name])) {
+                    $violations = $converter->validate($value[$name]);
+                    if (0 < count($violations)){
+                        $errors = array_merge($errors, $violations);
+                    }
                 }
             }
         }
@@ -178,20 +230,27 @@ class BaseModelConverter extends ValueConverter
                 $converter = array_shift($converter_annotations);
             }
             if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
-                // For base types we have a converter ready to use
-                $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                if ('array' == $type){
+                    // Deafults to array of strings
+                    $className = 'Akuehnis\SymfonyApi\Converter\StringConverter';
+                } else {
+                    // For base types we have a converter ready to use
+                    $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
+                }
                 if ($reflection_property->isInitialized($instance)){
                     $converter = new $className([
                         'default_value' => $reflection_property->getValue($instance),
                         'required' => false,
                         'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
                         'name' => $name,
+                        'is_array' => 'array' == $type,
                     ]);
                 } else {
                     $converter = new $className([
                         'required' => true,
                         'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
                         'name' => $name,
+                        'is_array' => 'array' == $type,
                     ]);
                 }
             }

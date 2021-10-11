@@ -19,8 +19,6 @@ class DocBuilder
     protected $config_areas = [];
     protected $RouteService;
 
-    private $base_types =  ['string', 'int', 'float', 'bool', 'array'];
-
     public function __construct(
         UrlGeneratorInterface $UrlGeneratorInterface
         , RouteService $RouteService

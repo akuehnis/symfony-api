@@ -5,7 +5,6 @@ namespace Akuehnis\SymfonyApi\EventSubscriber;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Akuehnis\SymfonyApi\Converter\BaseModelConverter;
-use Akuehnis\SymfonyApi\Converter\BaseModelArrayConverter;
 
 class ResponseSubscriber implements EventSubscriberInterface
 {
@@ -30,7 +29,7 @@ class ResponseSubscriber implements EventSubscriberInterface
             $response = new Response($jsonContent, 200, ['Content-Type' => 'application/json']);
             $event->setResponse($response);
         } else if (is_array($value) && is_object($value[0]) && is_subclass_of($value[0], 'Akuehnis\SymfonyApi\Models\BaseModel')){
-            $converter = new BaseModelArrayConverter(['class_name' => get_class($value[0])]);
+            $converter = new BaseModelConverter(['class_name' => get_class($value[0]), 'is_array' => true]);
             $output = $converter->normalize($value);
             $jsonContent = json_encode($output);
             $response = new Response($jsonContent, 200, ['Content-Type' => 'application/json']);
