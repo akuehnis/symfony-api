@@ -80,10 +80,13 @@ class BaseModelConverter extends ValueConverter
         if (null === $value){
             return null;
         }
+        if (is_array($value) && !$this->getIsArray()){
+            throw new \Exception(sprintf('Converter for class %s error: is_array is false.', $this->getClassName()));
+        }
         if ($this->getIsArray()){
             return array_map(function($val){
                 $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
-                return $converter->normalize($obj);
+                return $converter->normalize($val);
             }, $value);
         } else {
             $class_name = $this->getClassName();
