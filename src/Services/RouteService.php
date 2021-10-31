@@ -35,6 +35,23 @@ class RouteService
         return $reflection;
     }
 
+    public function getControllerClass($route)
+    {
+        if (!method_exists($route, 'getDefaults')){
+            return null;
+        }
+        $defaults = $route->getDefaults();
+        if (!isset($defaults['_controller']) || false === strpos($defaults['_controller'], '::')){
+            return null;
+        }
+        list($class, $method) = explode('::', $defaults['_controller']);
+        if (!class_exists($class)){
+            return null;
+        }
+        return $class;
+
+    }
+
     /**
      * used in QueryResover and RequestValidationSubscriber
      */
@@ -98,6 +115,12 @@ class RouteService
             continue;
         }
         return $converters;
+    }
+
+    public function getRouteDocComment($route)
+    {
+        $reflection = $this->getMethodReflection($route);
+        return $reflection->getDocComment();
     }
 
     

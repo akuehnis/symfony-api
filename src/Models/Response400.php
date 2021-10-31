@@ -4,7 +4,7 @@ namespace Akuehnis\SymfonyApi\Models;
 use Akuehnis\SymfonyApi\Models\ErrorModel;
 use Akuehnis\SymfonyApi\Converter\BaseModelConverter;
 
-class Response400
+class Response400 extends BaseModel
 {
     public string $detail = '';
 

@@ -4,9 +4,6 @@ namespace Akuehnis\SymfonyApi\Services;
 
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Doctrine\Common\Annotations\AnnotationReader;
-use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
-use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
-use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
 use Akuehnis\SymfonyApi\Services\RouteService;
 use Akuehnis\SymfonyApi\Models\Response400;
@@ -150,15 +147,8 @@ class DocBuilder
                 ];
             }
             
-            $route_descriptions = $this->RouteService->getRouteAnnotations($route, 'Akuehnis\SymfonyApi\Annotations\RouteDescription');
-            $route_description = array_shift($route_descriptions);
-            if ($route_description){
-                $summary = $route_description->summary;
-                $description = $route_description->description;
-            } else {
-                $summary = '';
-                $description = '';
-            }
+            $docblock = $this->RouteService->getRouteDocComment($route);
+            list($summary, $description) = $this->getSummaryAndDescription($docblock);
             foreach ($methods as $method){
                 $method = strtolower($method);
                 if (!isset($paths[$path])){
@@ -233,6 +223,32 @@ class DocBuilder
             $definitions[$converter->getClassNameShort()] = $converter->getSchema();
         }
         return $definitions;
+    }
+
+    /**
+     * returns tuple [summary, description]
+     */
+    public function getSummaryAndDescription(string $docblock) {
+        if (!$docblock){
+            $docblock = '';
+        }
+        $summary = '';
+        $description = '';
+        $a = explode("\n", $docblock);
+        foreach ($a as $i => $row){
+            $row = trim($row, ' */');
+            $row = trim($row);
+            if ('' == $row){
+                continue;
+            } else if (0 === strpos($row, '@')){
+                continue;
+            } else if ('' == $summary) {
+                $summary = $row;
+            } else {
+                $description.= $row;
+            }
+        }
+        return [$summary, $description];
     }
 
 }
