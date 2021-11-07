@@ -73,11 +73,13 @@ class RouteService
             'class_name' => 'Akuehnis\SymfonyApi\Models\Response400'
         ]);
         foreach ($this->getRouteAnnotations($route) as $annotation){
-            if (is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Converter\ValueConverter')
-                && method_exists($annotation, 'getName')
-                && 'response' == $annotation->getName()
-            ) {
-                $response_converters[$annotation->getStatus()] =  $annotation;
+            if (
+                get_class($annotation) == 'Akuehnis\SymfonyApi\Annotations\Response' ||
+                is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Annotations\Response')
+            ){
+                $response_converters[$annotation->status] =  new \Akuehnis\SymfonyApi\Converter\BaseModelConverter([
+                    'class_name' => $annotation->class_name
+                ]);
             }
         }
         return $response_converters;

@@ -47,12 +47,6 @@ class ValueConverter
     protected array $location = [];
 
 
-    /** 
-     * http status, only for Converters named 'response'
-    */
-    protected int $status = 200;
-
-
     public function __construct($params = [])
     {
         if (isset($params['default_value'])){
@@ -105,9 +99,6 @@ class ValueConverter
         }
         if (isset($params['location'])){
             $this->setLocation($params['location']);
-        }
-        if (isset($params['status'])){
-            $this->setStatus($params['status']);
         }
     }
 
@@ -228,15 +219,6 @@ class ValueConverter
 
     public function setLocation(array $location){
         $this->location = $location;
-    }
-
-    public function getStatus():int
-    {
-        return $this->status;
-    }
-
-    public function setStatus(int $status){
-        $this->status = $status;
     }
 
     public function getLocation():array

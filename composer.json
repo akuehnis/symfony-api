@@ -1,6 +1,6 @@
 {
     "name": "akuehnis/symfony-api",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "type": "library",
     "description": "Helper to quickly build APIs and OpenAPI description with Symfony",
     "keywords": ["php", "api", "symfony", "documentation", "doc", "rest"],
