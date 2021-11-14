@@ -114,15 +114,30 @@ class DocBuilder
             $request_body = null;
             foreach ($param_converters as $converter){
                 if ('body' == $converter->getLocation()[0]){
-                    $request_body = [
-                        'content' => [
-                            'application/json' => [
-                                'schema' => [
-                                    '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                    if ($converter->getIsArray()) {
+                        $request_body = [
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        'type' => 'array',
+                                        'items' => [
+                                            '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                                        ]
+                                    ]
                                 ]
                             ]
-                        ]
-                    ];
+                        ];
+                    } else {
+                        $request_body = [
+                            'content' => [
+                                'application/json' => [
+                                    'schema' => [
+                                        '$ref' => '#/components/schemas/' . $converter->getClassNameShort(),
+                                    ]
+                                ]
+                            ]
+                        ];
+                    }
                 } else {
                     $parameter =  [
                         'name' => $converter->getName(),
@@ -202,8 +217,8 @@ class DocBuilder
         foreach ($routes as $route){
             $param_converters = $this->RouteService->getRouteParamConverters($route);
             foreach ($param_converters as $converter){
-                if (get_class($converter) == 'Akuehnis\SymfonyApi\Converter\BaseModelConverter' ||
-                    is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')){
+                if (get_class($converter) == 'Akuehnis\SymfonyApi\Converter\ObjectConverter' ||
+                    is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\ObjectConverter')){
                     $class_names = array_merge($class_names, $converter->getAllClassNames());
                 }
                 if ('body' == $converter->getLocation()[0]){
@@ -211,15 +226,15 @@ class DocBuilder
                 }
             }
             foreach ($this->RouteService->getRouteResponseConverters($route) as $converter){
-                if (get_class($converter) == 'Akuehnis\SymfonyApi\Converter\BaseModelConverter' ||
-                    is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')){
+                if (get_class($converter) == 'Akuehnis\SymfonyApi\Converter\ObjectConverter' ||
+                    is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\ObjectConverter')){
                     $class_names = array_merge($class_names, $converter->getAllClassNames());
                 }
             }
         }
         $class_names = array_unique($class_names);
         foreach ($class_names as $class_name){
-            $converter = new \Akuehnis\SymfonyApi\Converter\BaseModelConverter(['class_name' => $class_name]);
+            $converter = new \Akuehnis\SymfonyApi\Converter\ObjectConverter(['class_name' => $class_name]);
             $definitions[$converter->getClassNameShort()] = $converter->getSchema();
         }
         return $definitions;

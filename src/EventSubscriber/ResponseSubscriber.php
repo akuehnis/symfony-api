@@ -4,7 +4,7 @@ namespace Akuehnis\SymfonyApi\EventSubscriber;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Response;
-use Akuehnis\SymfonyApi\Converter\BaseModelConverter;
+use Akuehnis\SymfonyApi\Converter\ObjectConverter;
 
 
 class ResponseSubscriber implements EventSubscriberInterface
@@ -39,7 +39,7 @@ class ResponseSubscriber implements EventSubscriberInterface
         }
         $route = $this->RouteService->getRouteFromRequest($request);
         if ($class_name && 'Akuehnis\SymfonyApi\Models\Response400' == $class_name){
-            $converter = new BaseModelConverter([
+            $converter = new ObjectConverter([
                 'class_name' => $class_name, 
                 'is_array' => false
             ]);
@@ -57,7 +57,7 @@ class ResponseSubscriber implements EventSubscriberInterface
                 ){
                     $is_array = is_array($value);
                     $status = $annotation->status;
-                    $converter = new BaseModelConverter([
+                    $converter = new ObjectConverter([
                         'class_name' => $annotation->class_name, 
                         'is_array' => $is_array
                     ]);

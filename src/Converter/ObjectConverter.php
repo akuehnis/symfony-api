@@ -4,10 +4,10 @@ namespace Akuehnis\SymfonyApi\Converter;
 use Doctrine\Common\Annotations\AnnotationReader;
 
 /** @Annotation */
-class BaseModelConverter extends ValueConverter
+class ObjectConverter extends ValueConverter
 {
 
-    protected $class_name = '\Akuehnis\SymfonyApi\Models\BaseModel';
+    protected $class_name = '';
 
     protected array $schema = []; // see getSchema()
 
@@ -31,8 +31,8 @@ class BaseModelConverter extends ValueConverter
     {
         $class_names = [$this->getClassName()];
         foreach ($this->getPropertyConverters() as $converter){
-            if (get_class($converter) ==  'Akuehnis\SymfonyApi\Converter\BaseModelConverter' ||
-                is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')
+            if (get_class($converter) ==  'Akuehnis\SymfonyApi\Converter\ObjectConverter' ||
+                is_subclass_of($converter, 'Akuehnis\SymfonyApi\Converter\ObjectConverter')
             ){
                 $class_names = array_merge($class_names, $converter->getAllClassNames());
             }
@@ -54,7 +54,7 @@ class BaseModelConverter extends ValueConverter
         }
         if ($this->getIsArray()){
             return array_map(function($val){
-                $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+                $converter = new ObjectConverter(['class_name' => $this->getClassName()]);
                 return $converter->denormalize($val);
             }, $value);
         } else {
@@ -85,7 +85,7 @@ class BaseModelConverter extends ValueConverter
         }
         if ($this->getIsArray()){
             return array_map(function($val){
-                $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+                $converter = new ObjectConverter(['class_name' => $this->getClassName()]);
                 return $converter->normalize($val);
             }, $value);
         } else {
@@ -110,7 +110,7 @@ class BaseModelConverter extends ValueConverter
     {
         
         if ($this->getIsArray()){
-            $converter = new BaseModelConverter(['class_name' => $this->getClassName()]);
+            $converter = new ObjectConverter(['class_name' => $this->getClassName()]);
             $class_schema = [
                 'type' => 'array',
                 'items' => [
@@ -173,7 +173,7 @@ class BaseModelConverter extends ValueConverter
                 foreach ($value as $i => $val){
                     $location = $this->getLocation();
                     $location[] = $i;
-                    $converter = new BaseModelConverter([
+                    $converter = new ObjectConverter([
                         'class_name' => $this->getClassName(),
                         'location' => $location,
                     ]);
@@ -186,7 +186,13 @@ class BaseModelConverter extends ValueConverter
         } else {
             foreach ($this->getPropertyConverters() as $converter){
                 $name = $converter->getName();
-                if ($converter->getRequired() && !array_key_exists($name, $value)) {
+                if (!is_array($value)){
+                    $errors[] = [
+                        'loc' => $converter->getLocation(),
+                        'msg' => 'Required',
+                    ];
+                }
+                else if ($converter->getRequired() && !array_key_exists($name, $value)) {
                     $errors[] = [
                         'loc' => $converter->getLocation(),
                         'msg' => 'Required',
@@ -232,7 +238,20 @@ class BaseModelConverter extends ValueConverter
             if (0 < count($converter_annotations)){
                 $converter = array_shift($converter_annotations);
             }
-            if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
+            if (!$converter && !in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
+                $className = 'Akuehnis\SymfonyApi\Converter\ObjectConverter';
+                $args = [
+                    'required' => true,
+                    'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
+                    'name' => $name,
+                    'class_name' => $type,
+                ];
+                if ($reflection_property->isInitialized($instance)){
+                    $args['default_value'] = $reflection_property->getValue($instance);
+                }
+                $converter = new $className($args);
+            }
+            elseif (!$converter){
                 if ('array' == $type){
                     // Deafults to array of strings
                     $className = 'Akuehnis\SymfonyApi\Converter\StringConverter';
@@ -240,41 +259,16 @@ class BaseModelConverter extends ValueConverter
                     // For base types we have a converter ready to use
                     $className = 'Akuehnis\SymfonyApi\Converter\\' . ucfirst($type).'Converter';
                 }
+                $args = [
+                    'required' => !$reflection_property->isInitialized($instance),
+                    'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
+                    'name' => $name,
+                    'is_array' => 'array' == $type,
+                ];
                 if ($reflection_property->isInitialized($instance)){
-                    $converter = new $className([
-                        'default_value' => $reflection_property->getValue($instance),
-                        'required' => false,
-                        'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
-                        'name' => $name,
-                        'is_array' => 'array' == $type,
-                    ]);
-                } else {
-                    $converter = new $className([
-                        'required' => true,
-                        'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
-                        'name' => $name,
-                        'is_array' => 'array' == $type,
-                    ]);
+                    $args['default_value'] = $reflection_property->getValue($instance);
                 }
-            }
-            if (!$converter && is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
-                $className = 'Akuehnis\SymfonyApi\Converter\BaseModelConverter';
-                if ($reflection_property->isInitialized($instance)){
-                    $converter = new $className([
-                        'default_value' => $reflection_property->getValue($instance),
-                        'required' => false,
-                        'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
-                        'name' => $name,
-                        'class_name' => $type,
-                    ]);   
-                } else {
-                    $converter = new $className([
-                        'required' => true,
-                        'nullable' => $reflection_named_type ? $reflection_named_type->allowsNull() : false,
-                        'name' => $name,
-                        'class_name' => $type,
-                    ]);
-                }
+                $converter = new $className($args);
             }
 
             if ($converter){

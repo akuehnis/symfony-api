@@ -5,6 +5,7 @@ namespace Akuehnis\SymfonyApi\Services;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 use Doctrine\Common\Annotations\AnnotationReader;
+use Akuehnis\SymfonyApi\Converter\ObjectConverter;
 
 class RouteService
 {
@@ -69,7 +70,7 @@ class RouteService
     {
         $response_converters = [];
         $response_converters[200] = new \Akuehnis\SymfonyApi\Converter\StringConverter();
-        $response_converters[400] = new \Akuehnis\SymfonyApi\Converter\BaseModelConverter([
+        $response_converters[400] = new \Akuehnis\SymfonyApi\Converter\ObjectConverter([
             'class_name' => 'Akuehnis\SymfonyApi\Models\Response400'
         ]);
         foreach ($this->getRouteAnnotations($route) as $annotation){
@@ -77,7 +78,7 @@ class RouteService
                 get_class($annotation) == 'Akuehnis\SymfonyApi\Annotations\Response' ||
                 is_subclass_of($annotation, 'Akuehnis\SymfonyApi\Annotations\Response')
             ){
-                $response_converters[$annotation->status] =  new \Akuehnis\SymfonyApi\Converter\BaseModelConverter([
+                $response_converters[$annotation->status] =  new \Akuehnis\SymfonyApi\Converter\ObjectConverter([
                     'class_name' => $annotation->class_name
                 ]);
             }
@@ -139,17 +140,33 @@ class RouteService
         if ($parameter_reflection->isDefaultValueAvailable()){
             $defaultValue = $parameter_reflection->getDefaultValue();
         }
-        if (is_object($defaultValue) && is_subclass_of($defaultValue, 'Akuehnis\SymfonyApi\Converter\ValueConverter')){
-            // From PHP 8.1 Objects can be passed as default value. This should extend ValueConverter
-            $converter = $defaultValue;
-        } else {
-            // Try to find converter for this parameter from annotations
-            $annotations = $this->getRouteAnnotations($route);
+        $converter = null;
+        // Try to find converter for this parameter from annotations
+        $annotations = $this->getRouteAnnotations($route);
+        $body_annotations = array_filter($annotations, function($item) use ($name) {
+            return get_class($item) == 'Akuehnis\SymfonyApi\Annotations\Body'
+                && $item->getName() == $name
+                ;     
+        });
+        $body_annotation = array_shift($body_annotations);
+        if ($body_annotation){
+            $args = [
+                'class_name' => $body_annotation->getClassName(),
+                'is_array' => $body_annotation->isArray(),
+                'name' => $body_annotation->getName(),
+                'required' => !$parameter_reflection->isDefaultValueAvailable(),
+                'nullable' => $parameter_reflection->allowsNull(),
+            ];
+            if ($parameter_reflection->isDefaultValueAvailable()){
+                $args['default_value'] = $parameter_reflection->getDefaultValue();
+            }
+            $converter =  new ObjectConverter($args);
+        }
+        if (!$converter){
             $converter_annotations = array_filter($annotations, function($item) use ($name) {
                 return is_subclass_of(get_class($item), 'Akuehnis\SymfonyApi\Converter\ValueConverter') &&
                     $item->getName() == $name;
             });
-            
             $converter = array_shift($converter_annotations);
         }
         if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
@@ -179,33 +196,14 @@ class RouteService
                 ]);
             }
         }
-        if (!$converter && is_subclass_of($type, 'Akuehnis\SymfonyApi\Models\BaseModel')){
-            $className = 'Akuehnis\SymfonyApi\Converter\BaseModelConverter';
-            if ($parameter_reflection->isDefaultValueAvailable()){
-                $converter = new $className([
-                    'default_value' => $parameter_reflection->getDefaultValue(),
-                    'required' => false,
-                    'nullable' => $parameter_reflection->allowsNull(),
-                    'name' => $name,
-                    'class_name' => $type,
-                ]);   
-            } else {
-                $converter = new $className([
-                    'required' => true,
-                    'nullable' => $parameter_reflection->allowsNull(),
-                    'name' => $name,
-                    'class_name' => $type,
-                ]);
-            }
-        }
         if ($converter){
             $location = ['query'];
             if (false !== strpos($route->getPath(), '{'.$name.'}')){
                 $location = ['path']; 
             }
             if (
-                get_class($converter) =='Akuehnis\SymfonyApi\Converter\BaseModelConverter' ||
-                is_subclass_of(get_class($converter), 'Akuehnis\SymfonyApi\Converter\BaseModelConverter')
+                get_class($converter) =='Akuehnis\SymfonyApi\Converter\ObjectConverter' ||
+                is_subclass_of(get_class($converter), 'Akuehnis\SymfonyApi\Converter\ObjectConverter')
                 ){
                 $location = ['body'];
             }
