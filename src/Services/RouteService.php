@@ -133,9 +133,7 @@ class RouteService
      * Returns the converter for a method parameter
      */
     public function getParameterConverter($route, $parameter_reflection){
-        $reflection_type = $parameter_reflection->getType();
         $name = $parameter_reflection->getName();
-        $type = $reflection_type->getName();
         $defaultValue = null;
         if ($parameter_reflection->isDefaultValueAvailable()){
             $defaultValue = $parameter_reflection->getDefaultValue();
@@ -150,8 +148,17 @@ class RouteService
         });
         $body_annotation = array_shift($body_annotations);
         if ($body_annotation){
+            $class_name = $body_annotation->getClassName();
+            if (null === $class_name){
+                $reflection_type = $parameter_reflection->getType();
+                if (null === $reflection_type) {
+                    throw new \Exception('Body annotation found but classname is not found. 
+                    Try typehinting the controller paremeter or define class_name in annotation.');
+                }
+                $class_name = $reflection_type->getName();
+            }
             $args = [
-                'class_name' => $body_annotation->getClassName(),
+                'class_name' => $class_name,
                 'is_array' => $body_annotation->isArray(),
                 'name' => $body_annotation->getName(),
                 'required' => !$parameter_reflection->isDefaultValueAvailable(),
@@ -169,6 +176,9 @@ class RouteService
             });
             $converter = array_shift($converter_annotations);
         }
+        // Wenn Parameter nicht Type-Hinted ist, dann ist reflection_type null
+        $reflection_type = $parameter_reflection->getType();
+        $type = $reflection_type ? $reflection_type->getName() : null;
         if (!$converter && in_array($type, ['bool', 'string', 'int', 'float', 'array'])){
 
             // For base types we have a converter ready to use

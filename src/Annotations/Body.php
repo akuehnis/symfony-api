@@ -27,7 +27,7 @@ class Body {
      *
      * @var string
      */
-    public string $class_name;
+    public ?string $class_name = null;
 
     public function __construct($props){
         if (isset($props['is_array'])) {
@@ -46,7 +46,7 @@ class Body {
         return $this->name;
     }
 
-    public function getClassName():string
+    public function getClassName():?string
     {
         return $this->class_name;
     }
