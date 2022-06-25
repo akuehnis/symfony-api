@@ -1,6 +1,6 @@
 # Symfony-API
 
-See https://symfonyapi.akuehnis.com/ for documentation.
+THIS REPOSITORY IS DEPRICATED. THERE WILL BE NO FURTHER DEVELPOMENT.
 
 Symfony-API allows to build and document APIs.
 
